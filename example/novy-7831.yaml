@@ -1,0 +1,97 @@
+substitutions:
+  name: novy-7831
+  friendly_name: Novy 7831
+  board: esp32-c3-devkitm-1
+  data_pin: GPIO4
+  pairing_code: "1"
+  power_entity: sensor.novy_smart_plug_power
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2026.9.0
+
+esp32:
+  board: ${board}
+  framework:
+    type: esp-idf
+    version: 5.5.5
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  reboot_timeout: 0s
+
+api:
+  reboot_timeout: 0s
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+logger:
+  level: INFO
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [novy]
+
+remote_transmitter:
+  id: novy_rf
+  pin: ${data_pin}
+  carrier_duty_percent: 100%
+  non_blocking: true
+  eot_level: false
+
+sensor:
+  - platform: homeassistant
+    id: hood_power
+    name: Measured power
+    entity_id: ${power_entity}
+    internal: false
+    unit_of_measurement: W
+    device_class: power
+    state_class: measurement
+    # Do not filter NaN or generate heartbeat samples: both hide lost feedback.
+
+novy:
+  id: hood
+  transmitter_id: novy_rf
+  power_sensor_id: hood_power
+  pairing_code: ${pairing_code}
+  averaging_window: 3s
+  stale_timeout: 30s
+  settle_time: 3s
+  step_timeout: 30s
+  # Empty deliberately. Follow docs/commissioning.md before adding ten ranges.
+  calibration: []
+  fan:
+    name: Fan
+  light:
+    name: Light
+    restore_mode: ALWAYS_OFF
+  raw_buttons:
+    power:
+      name: Raw power
+    light:
+      name: Raw light
+    plus:
+      name: Raw speed up
+    minus:
+      name: Raw speed down
+    novy:
+      name: Raw Novy
+  average_power:
+    name: Average power
+  reading_age:
+    name: Reading age
+  feedback_valid:
+    name: Feedback valid
+  inferred_mode:
+    name: Inferred mode
+  command_status:
+    name: Command status
