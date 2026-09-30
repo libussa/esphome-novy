@@ -1,0 +1,235 @@
+{
+  "observations": {
+    "date": "2026-10-01",
+    "board": "AZDelivery ESP32 NodeMCU Dev Kit C CP2102",
+    "transmitter": "STX882 r433 GPIO4",
+    "plug_model": "Shelly Plug M Gen3",
+    "plug_mac": "70AF09E08A6C",
+    "poll_interval_s": 1,
+    "settle_s": 15,
+    "steady_s": 40,
+    "user_confirmed": [
+      "one speed LED at speed 1",
+      "boost indicated at speed 4"
+    ],
+    "relay_switched": false,
+    "source": "fresh Switch.GetStatus RPC over LAN"
+  },
+  "runs": [
+    {
+      "mode": "fan_0_dark",
+      "samples": 40,
+      "min_w": 0.0,
+      "max_w": 0.0,
+      "mean_w": 0.0,
+      "median_w": 0.0,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_0_dark_final",
+      "samples": 30,
+      "min_w": 0.0,
+      "max_w": 0.0,
+      "mean_w": 0.0,
+      "median_w": 0.0,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_0_light",
+      "samples": 40,
+      "min_w": 6.9,
+      "max_w": 7.0,
+      "mean_w": 6.97,
+      "median_w": 7.0,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_1_dark",
+      "samples": 40,
+      "min_w": 83.6,
+      "max_w": 85.7,
+      "mean_w": 85.198,
+      "median_w": 85.45,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_1_dark_repeat",
+      "samples": 30,
+      "min_w": 78.0,
+      "max_w": 79.8,
+      "mean_w": 79.46,
+      "median_w": 79.7,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_1_light",
+      "samples": 40,
+      "min_w": 93.5,
+      "max_w": 94.7,
+      "mean_w": 94.095,
+      "median_w": 94.1,
+      "max_poll_gap_s": 1.003
+    },
+    {
+      "mode": "fan_1_light_repeat",
+      "samples": 30,
+      "min_w": 85.3,
+      "max_w": 85.6,
+      "mean_w": 85.453,
+      "median_w": 85.5,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_2_dark",
+      "samples": 40,
+      "min_w": 146.5,
+      "max_w": 148.6,
+      "mean_w": 147.588,
+      "median_w": 147.55,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_2_dark_repeat",
+      "samples": 30,
+      "min_w": 140.8,
+      "max_w": 141.6,
+      "mean_w": 141.14,
+      "median_w": 141.1,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_2_light",
+      "samples": 40,
+      "min_w": 144.6,
+      "max_w": 152.0,
+      "mean_w": 150.465,
+      "median_w": 151.25,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_2_light_repeat",
+      "samples": 30,
+      "min_w": 146.3,
+      "max_w": 146.8,
+      "mean_w": 146.553,
+      "median_w": 146.6,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_3_dark",
+      "samples": 40,
+      "min_w": 208.4,
+      "max_w": 210.5,
+      "mean_w": 209.363,
+      "median_w": 209.45,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_3_dark_repeat",
+      "samples": 30,
+      "min_w": 206.7,
+      "max_w": 208.4,
+      "mean_w": 207.613,
+      "median_w": 207.55,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_3_light",
+      "samples": 40,
+      "min_w": 215.6,
+      "max_w": 218.0,
+      "mean_w": 216.382,
+      "median_w": 216.3,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_3_light_repeat",
+      "samples": 30,
+      "min_w": 212.5,
+      "max_w": 214.7,
+      "mean_w": 213.577,
+      "median_w": 213.55,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_4_dark",
+      "samples": 40,
+      "min_w": 228.0,
+      "max_w": 230.7,
+      "mean_w": 228.938,
+      "median_w": 228.9,
+      "max_poll_gap_s": 1.001
+    },
+    {
+      "mode": "fan_4_light",
+      "samples": 40,
+      "min_w": 235.1,
+      "max_w": 236.3,
+      "mean_w": 235.588,
+      "median_w": 235.5,
+      "max_poll_gap_s": 1.075
+    }
+  ],
+  "ranges": [
+    {
+      "speed": 0,
+      "light": false,
+      "min_power": 0,
+      "max_power": 1.0
+    },
+    {
+      "speed": 0,
+      "light": true,
+      "min_power": 5.9,
+      "max_power": 8.0
+    },
+    {
+      "speed": 1,
+      "light": false,
+      "min_power": 77.0,
+      "max_power": 86.7
+    },
+    {
+      "speed": 1,
+      "light": true,
+      "min_power": 84.3,
+      "max_power": 95.7
+    },
+    {
+      "speed": 2,
+      "light": false,
+      "min_power": 139.8,
+      "max_power": 149.6
+    },
+    {
+      "speed": 2,
+      "light": true,
+      "min_power": 143.6,
+      "max_power": 153.0
+    },
+    {
+      "speed": 3,
+      "light": false,
+      "min_power": 205.7,
+      "max_power": 211.5
+    },
+    {
+      "speed": 3,
+      "light": true,
+      "min_power": 211.5,
+      "max_power": 219.0
+    },
+    {
+      "speed": 4,
+      "light": false,
+      "min_power": 227.0,
+      "max_power": 231.7
+    },
+    {
+      "speed": 4,
+      "light": true,
+      "min_power": 234.1,
+      "max_power": 237.3
+    }
+  ]
+}

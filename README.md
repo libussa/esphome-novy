@@ -1,13 +1,14 @@
 # Novy 7831 ESPHome controller
 
 An ESP32 and STX882 transmitter control a Novy hood over 433.92 MHz RF.
-Home Assistant supplies the smart plug's power readings; classification and
-command sequencing run on the ESP32. A local ESPHome external component exposes
+The smart plug supplies power readings, through Home Assistant or direct HTTP
+polling; classification and command sequencing run on the ESP32. A local ESPHome external component exposes
 a standard four-speed fan and an on/off light, corrected by measured power.
 
-**Status: software validated; physical Novy 7831 acceptance is still required.**
-The installed receiver already works with its physical remote. ESP RF timing,
-pairing, power signatures and command semantics must still be checked on it.
+**Status: raw RF confirmed on the installed AZDelivery board; state-aware
+control acceptance remains pending.** Its power signatures have been measured,
+including warm-motor repeats. New installations still require RF, pairing,
+command and power-feedback checks.
 
 ## Setup
 
@@ -34,6 +35,34 @@ This is a build profile, not confirmation of your board or wiring. Use ESP-IDF
 and an ESP32 variant with RMT support. The external component source is local;
 copy the `components` directory alongside the example when moving the config.
 
+For a separate Novy board using the **AZDelivery ESP32 NodeMCU Dev Kit C with
+CP2102**, use [`example/novy-7831-azdelivery.yaml`](example/novy-7831-azdelivery.yaml).
+It targets the classic ESP32-WROOM-32 with `board: esp32dev`, 4 MB flash and
+ESP-IDF 5.5.5; it needs no PSRAM. Connect STX882 DATA to GPIO4, VCC to 3.3 V and
+GND to GND. The CP2102 USB connector supplies power and serial flashing/logging.
+The Eaton USB/NUT controller stays on its separate ESP32-S3 board.
+
+This installation's profile uses the local Novy component and polls the Shelly
+Plug M Gen3 once per second, including when watts stay unchanged. Configure its
+status URL and MAC address in the substitutions and reserve its IP in DHCP.
+API and OTA share a unique encryption key from
+`!secret api_encryption_key`. After filling in the secrets file, validate and
+compile with `esphome config example/novy-7831-azdelivery.yaml` and
+`esphome compile example/novy-7831-azdelivery.yaml`. Add the new node to HA's
+ESPHome integration for the fan, light and diagnostic entities. The original
+`sensor.prise_hotte_power` remains available separately in HA.
+
+The AZDelivery profile includes the captured power waveform confirmed working
+on this hood, via `example/novy-power-waveform.yaml`. That waveform includes
+pairing code 1; changing `pairing_code` does not rewrite its captured bits.
+See [capture results](docs/power-rf-capture.md). Receiver logging is optional;
+follow the receiver capture section in the commissioning guide to enable it.
+It also includes this hood's measured ten-state calibration and the initial and
+warm-motor evidence in [power learning](docs/power-learning.md). The light-on
+and light-off signatures overlap at some wattages. Fan targets still use the
+independently confirmed speed; light targets use the remembered-state fallback
+and remain unconfirmed until distinguishable feedback arrives. This calibration is not a default for other hoods.
+
 ## Home Assistant entities
 
 | Entity | Meaning |
@@ -43,7 +72,9 @@ copy the `components` directory alongside the example when moving the config.
 | Measured power | Original incoming power, including invalid/unavailable values |
 | Average power | Average of actual samples in each completed window |
 | Reading age | Seconds since the last finite, non-negative received power value |
-| Feedback valid | Whether the inferred state currently authorizes target commands |
+| Feedback valid | Both fan speed and light state are confirmed |
+| Fan feedback valid | Fan speed is confirmed independently of light ambiguity |
+| Light feedback valid | Light state is confirmed rather than remembered/assumed |
 | Inferred mode | `off`, `fan_1`…`fan_3`, `boost`, with `_light` if on; otherwise `unknown` |
 | Command status | Ready, transmission/confirmation progress, or rejection/failure reason |
 | Five raw buttons | Power, light, speed up, speed down, Novy; disabled by default in HA |
@@ -55,30 +86,47 @@ Hood integration is needed. Ordinary `fan.turn_on`, `fan.set_percentage`,
 controller. A fan-on request without a speed uses the current speed if already
 running, otherwise speed 1. Fan off walks down with confirmed minus commands.
 
-Fan/light values represent the **last confirmed observation**. Native ESPHome
-fan/light entities cannot independently express an unknown power-inference
-state: before the first observation they display off, and during feedback loss
-they retain previous values. Always consult **Feedback valid**, particularly in
-HA automations. Neither the initial off value nor a retained value proves the
-physical hood is off. Requests are refused when feedback is invalid.
+Fan values represent the last confirmed speed. The AZDelivery light uses
+`light_on_ambiguity: last_known`: an explicit changed on/off target sends one
+toggle based on the remembered value and updates that value when RF completes.
+This is an **unconfirmed assumption**, not acknowledgement from the hood. Equal
+requests send no extra toggle. Distinguishable feedback corrects the remembered
+value; stale, invalid or unrecognized feedback does not permit a fallback.
+At startup the displayed light defaults to off until observation establishes it;
+no startup restoration transmits RF.
+
+Consult **Fan feedback valid** for fan observations and **Light feedback valid**
+for verified light observations. The original **Feedback valid** means both are
+confirmed. It can be false while fan targets remain usable. With the default
+`light_on_ambiguity: reject`, only confirmed light state authorizes a light target.
 
 The adapter intercepts normal binary light requests before ESPHome publishes
-their target, retaining the observation until confirmation. Publishing an
-observation never sends RF. Do not configure light effects, flashes or startup
-automations to control this device.
+their target, retaining the previous value until feedback or an explicitly
+enabled remembered light request finishes RF. Publishing either value never
+sends RF. Do not configure light effects, flashes or startup automations.
 
 ## Calibration and feedback
 
-The example ships with `calibration: []`: raw commands work, but fan/light
+The generic C3 example ships with `calibration: []`: raw commands work, but fan/light
 targets cannot transmit. Replace it with **all ten** speed/light combinations
 after measurement. Each entry has `speed` (0–4), `light` (boolean), `min_power`
 and `max_power` (inclusive watts). Duplicate combinations, partial tables,
 negative/non-finite values and reversed ranges are rejected at config time.
 
-Exactly one range must contain the averaged reading. Overlapping ranges are
-allowed in the configuration, but readings in the overlap are **ambiguous** and
-cannot authorize control. There is no nearest-match guess and no learned or
-predicted state substituted for measurement.
+Each axis is classified independently. All matching ranges must agree on fan
+speed to confirm speed, and must agree on light state to confirm light. Thus a
+same-speed light overlap leaves the fan usable while light confidence is false.
+Cross-speed overlap blocks fan targets. No nearest-range guess is used.
+`light_on_ambiguity` accepts `reject` (default) or `last_known` (opt-in); the latter
+allows a manual light target using the remembered value when fan feedback is
+fresh and confirmed. It never makes assumed light state verified feedback.
+
+The installed AZDelivery profile uses 2-second windows, 2-second settling and a
+15-second step timeout with 1 Hz direct Shelly readings. Replaying the captured
+transitions confirmed fan speed in about 7–9 seconds, including simulated RF,
+without incorrect unique classifications. Hardware timing after upload remains
+to be checked. The generic component defaults below remain suitable starting
+points for a separately commissioned installation.
 
 | Setting | Default | Behavior |
 | --- | --- | --- |
@@ -88,8 +136,9 @@ predicted state substituted for measurement.
 | `step_timeout` | `30s` | Stop waiting for confirmation; also bound missing RF completion |
 
 Two consecutive populated windows must agree before a state is confirmed.
-Empty windows, NaN, negative values, unmatched ranges and ambiguous ranges
-invalidate feedback immediately. A first window indicating a different state
+Empty windows, NaN and negative values invalidate both axes immediately.
+Unmatched ranges clear confidence; matching ranges that disagree clear only the
+affected axis. A first window indicating a different state
 also prevents use of the old observation while the second window is pending.
 The 30-second stale timeout is an additional guard, **not permission to reuse
 the last reading in otherwise empty windows**.
@@ -101,21 +150,31 @@ integration only emits state changes, state-aware control may remain invalid;
 use genuine periodic meter reports or a different metering path. Do not add a
 heartbeat that republishes cached power to make the validity indicator green.
 
-HA remains a dependency. A received HA state can itself be cached; receipt age
+With the generic HA input, a received state can itself be cached; receipt age
 does not prove the meter just measured it. Verify the plug integration marks
 loss of communication unavailable and provides genuine periodic reports.
 Disconnect detection also checks API state subscribers, but another subscribed
 client can conceal HA's departure; sample/window expiration remains necessary.
+The AZDelivery HTTP package reads the plug directly and checks its MAC, relay
+state, errors and power value on each response. Failed requests or invalid
+responses publish NaN; it never repeats a cached reading. An HA disconnection
+still cancels a pending operation, while fresh plug samples can reestablish
+feedback independently.
 
 ## Commands and failure behavior
 
-- An already-satisfied target sends nothing. Otherwise, the controller sends
-  one fan step or one light toggle, waits for RF completion, discards settling
-  samples and waits for two fresh confirming windows before proceeding.
-- Targets are serialized. A second target is rejected while busy. No target,
+- An already-satisfied target sends nothing. Fan requests send one step and
+  wait for RF completion, settling and two fresh speed-confirming windows before
+  proceeding. They preserve the light regardless of light inference ambiguity.
+- With `last_known`, a changed light target sends one toggle, records its assumed
+  result after RF completion, and releases the operation. Light feedback remains
+  false until fresh unambiguous observations verify or correct that assumption.
+- In-flight targets are serialized. A second target is rejected while busy. No target,
   prediction or pending operation is restored after reboot or reconnection.
 - Unchanged feedback waits until the deadline; an unexpected confirmed change
-  aborts the target. Invalid feedback also aborts. There are no automatic RF
+  aborts a fan target when its speed differs from the expected step. An independent
+  light change does not abort fan sequencing. Meter loss also aborts; fresh
+  out-of-range motor transients wait until the deadline without retrying. There are no automatic RF
   retries. Command status reports the failure; a later recovery does not resume
   the abandoned target.
 - A raw button cancels a pending target. If RF is already in flight, one raw

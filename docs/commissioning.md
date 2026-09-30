@@ -53,6 +53,50 @@ table. Different receiver semantics require a controller change. If reception
 is unreliable or light presses dim, inspect the RF envelope/repetition with a
 receiver or logic analyzer and adjust the encoder only with measured evidence.
 
+### Capture the original remote with an SRX882S
+
+For the classic AZDelivery ESP32 profile, the optional package
+[`example/novy-rf-capture.yaml`](../example/novy-rf-capture.yaml) enables raw
+pulse logging and RCSwitch decoding without acting on received signals.
+
+Use a **433 MHz SRX882S**. Power off the ESP before connecting its printed
+pad labels as follows:
+
+| SRX882S pad | ESP32 connection |
+| --- | --- |
+| VCC | 3.3 V |
+| CS | 3.3 V |
+| GND | GND |
+| DATA | GPIO27 |
+| ANT | 433 MHz antenna |
+
+CS must be high: the SRX882S sleeps if it is left floating. Follow the pad
+labels rather than an assumed left-to-right order. Supply it from 3.3 V so
+its DATA output stays compatible with the ESP32. See the
+[manufacturer's pin definitions](https://www.nicerf.com/ask-modules/superheterodyne-receiver-srx882s.html)
+and [CS behavior](https://www.nicerf.com/news/superheterodyne-receiver-module-srx882s-srx882.html).
+The existing STX882 DATA connection stays on GPIO4.
+
+To enable this diagnostic package, place it beside the main classic ESP32
+configuration and add (or merge with an existing `packages` section):
+
+```yaml
+packages:
+  rf_capture: !include novy-rf-capture.yaml
+```
+
+Set the main configuration's `logger.level` to `DEBUG` as well if it already
+declares a logger level, because main-config values override package values.
+
+Validate, compile and manually upload the main configuration before capturing.
+Open ESPHome logs, then briefly press the original remote's power button three
+times, with two seconds between presses. Repeat for light and speed up, and
+record which button each capture belongs to. Use a little distance between the
+remote and receiver (about one metre is a useful starting point). Keep both
+raw timings and decoded results; an absent RCSwitch decode does not mean the
+raw capture is unusable. Compare with one ESPHome raw power transmission
+after recording the original remote. Remove the diagnostic package when done.
+
 ## 3. Measure power and reporting cadence
 
 Use the physical controls or raw buttons to set each combination. Allow the
@@ -98,21 +142,32 @@ Keep `step_timeout` greater than `settle_time + 2 * averaging_window`, with
 additional room for real settling and reporting delays; increase `stale_timeout`
 if necessary. Defaults assume frequent reporting. An integration that suppresses
 identical readings may need genuine periodic reporting enabled at its source.
+The installed AZDelivery profile instead uses
+[`novy-shelly-power.yaml`](../example/novy-shelly-power.yaml) for a fresh Shelly
+HTTP status request every second. Set the actual status URL and expected MAC,
+reserve the address in DHCP, and use an internal template `hood_power` sensor
+with `update_interval: never`. The package checks identity, relay state, errors
+and the power value. Failure supplies NaN, rather than a cached heartbeat.
 
 ## 4. Enable and accept state-aware controls
 
 Validate, compile and manually upload the configuration with the full table.
 Confirm these scenarios; leave physical acceptance pending until they pass:
 
-- Two populated stable windows establish the correct mode for every combination.
+- Two populated stable windows establish each independently distinguishable
+  axis. Check Fan feedback valid and Light feedback valid separately; a same-speed
+  light overlap must not block fan targets.
 - Already-satisfied fan/light requests send no RF.
 - All fan targets reach the requested speed, including off and boost, while
   preserving the light. Every intermediate step waits for feedback.
-- Light requests toggle only when needed and preserve fan speed.
+- Light requests toggle only when needed and preserve fan speed. With
+  `light_on_ambiguity: last_known`, check that one changed explicit target sends
+  one toggle, updates the remembered value after RF completion, and leaves Light
+  feedback valid false until verified. Repeating that target must send no toggle.
 - Physical-remote and hood-panel changes correct the displayed observations.
 - Boost expiry and any delayed stop are reported when they actually occur.
-- An unexpected physical change during a target operation aborts it, without
-  extra commands trying to fight the user.
+- An unexpected fan speed during a fan target aborts it, without extra commands
+  trying to fight the user. A separate light change does not block fan sequencing.
 - Raw buttons cancel target operations without interleaving RF transmissions.
 - Stop HA, interrupt the plug connection, and observe an unavailable source:
   feedback becomes invalid, pending targets stop, and new targets send nothing.
@@ -122,7 +177,10 @@ Confirm these scenarios; leave physical acceptance pending until they pass:
 - Reboot the ESP with the hood both on and off. No RF is sent at startup and
   Feedback valid stays false until new readings confirm the state.
 
-Until feedback is valid, fan/light displays are only last-known values (off at
-startup). Include the validity entity wherever HA automations use those states.
+Fan displays retain the last confirmed speed. With the AZDelivery remembered-light
+fallback, light displays may be an explicitly requested, unconfirmed assumption
+after RF completion. Consult each axis's validity entity wherever HA automations
+use its observed state; the original full Feedback valid means both are verified.
+Startup displays are off until observations establish them, without startup RF.
 Record command errors and raw-button results rather than repeatedly retrying an
 uncertain toggle.

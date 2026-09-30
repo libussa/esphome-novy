@@ -63,11 +63,15 @@ class NovyComponent : public Component {
   void set_transmitter(remote_transmitter::RemoteTransmitterComponent *value) { transmitter_ = value; }
   void set_power_sensor(sensor::Sensor *value) { power_ = value; }
   void set_pairing_code(unsigned value) { pairing_code_ = value; }
+  void set_power_waveform(const std::vector<int32_t> &value) { power_waveform_ = value; }
   void set_fan(NovyFan *value) { fan_ = value; }
   void set_light(NovyLight *value) { light_ = value; }
   void set_average_sensor(sensor::Sensor *value) { average_ = value; }
   void set_age_sensor(sensor::Sensor *value) { age_ = value; }
   void set_valid_sensor(binary_sensor::BinarySensor *value) { valid_ = value; }
+  void set_speed_valid_sensor(binary_sensor::BinarySensor *value) { speed_valid_ = value; }
+  void set_light_valid_sensor(binary_sensor::BinarySensor *value) { light_valid_ = value; }
+  void set_allow_unconfirmed_light(bool value) { controller_.allow_unconfirmed_light = value; }
   void set_mode_sensor(text_sensor::TextSensor *value) { mode_ = value; }
   void set_status_sensor(text_sensor::TextSensor *value) { status_ = value; }
   void set_timing(uint32_t window, uint32_t stale, uint32_t settle, uint32_t timeout) {
@@ -87,11 +91,12 @@ class NovyComponent : public Component {
   Controller controller_;
   remote_transmitter::RemoteTransmitterComponent *transmitter_{nullptr};
   sensor::Sensor *power_{nullptr}, *average_{nullptr}, *age_{nullptr};
-  binary_sensor::BinarySensor *valid_{nullptr};
+  binary_sensor::BinarySensor *valid_{nullptr}, *speed_valid_{nullptr}, *light_valid_{nullptr};
   text_sensor::TextSensor *mode_{nullptr}, *status_{nullptr};
   NovyFan *fan_{nullptr};
   NovyLight *light_{nullptr};
   unsigned pairing_code_{1};
+  std::vector<int32_t> power_waveform_;
   bool ready_{false}, connected_{false};
   uint32_t last_age_publish_{0};
 };

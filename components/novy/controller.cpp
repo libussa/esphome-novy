@@ -58,6 +58,8 @@ bool Controller::calibrated() const {
 }
 
 void Controller::set_status_(const char *value) {
+  if (status_ == value)
+    return;
   status_ = value;
   if (status)
     status(status_);
@@ -67,22 +69,21 @@ void Controller::reset_window_(uint32_t now) {
   window_start_ = now;
   sum_ = 0;
   samples_ = 0;
-  candidate_count_ = 0;
+  speed_count_ = light_count_ = 0;
 }
 
 void Controller::start(uint32_t now) {
   reset_window_(now);
-  if (validity)
-    validity(false);
+  set_confidence_(false, false);
+  status_.clear();  // Publish the initial status even when it is uncalibrated.
   set_status_(calibrated() ? "waiting_for_feedback" : "uncalibrated");
 }
 
 void Controller::invalidate_(const char *reason, uint32_t now) {
-  valid_ = false;
   active_ = false;
+  unconfirmed_light_request_ = false;
   reset_window_(now);
-  if (validity)
-    validity(false);
+  set_confidence_(false, false);
   set_status_(reason);
 }
 
@@ -150,76 +151,142 @@ void Controller::tick(uint32_t now) {
   }
   unsigned matches = 0;
   Mode match;
+  bool speed_known = true, light_known = true;
   for (const auto &entry : calibration) {
     if (average >= entry.min_power && average <= entry.max_power) {
+      if (matches) {
+        speed_known = speed_known && match.speed == entry.mode.speed;
+        light_known = light_known && match.light == entry.mode.light;
+      } else {
+        match = entry.mode;
+      }
       ++matches;
-      match = entry.mode;
     }
   }
-  if (matches != 1) {
-    invalidate_(matches == 0 ? "unrecognized_power" : "ambiguous_power", now);
+  if (!matches) {
+    speed_count_ = light_count_ = 0;
+    set_confidence_(false, false);
+    // Fresh out-of-range readings during motor acceleration are not loss of
+    // the meter. Await the deadline without retrying or advancing a fan step.
+    if (active_)
+      set_status_("awaiting_confirmation");
+    else if (status_ != "confirmation_timeout" && status_ != "transmission_failed" &&
+             status_ != "unexpected_state" && status_ != "transmitter_timeout")
+      set_status_("unrecognized_power");
     return;
   }
-  // A different candidate cannot authorize actions based on the old observation.
-  if (valid_ && match != mode_) {
-    valid_ = false;
-    if (validity)
-      validity(false);
-  }
-  if (!candidate_count_ || match != candidate_) {
-    candidate_ = match;
-    candidate_count_ = 1;
-    return;
-  }
-  candidate_count_ = 2;  // Saturates; long stable runs cannot overflow.
-  confirm_(match, now);
+  confirm_(speed_known, match.speed, light_known, match.light, now);
 }
 
-void Controller::confirm_(Mode mode, uint32_t now) {
-  const bool changed = !has_observation_ || mode != mode_;
-  mode_ = mode;
-  has_observation_ = true;
-  valid_ = true;
-  if (changed && observed)
-    observed(mode);
+void Controller::set_confidence_(bool speed, bool light) {
+  speed_valid_ = speed;
+  light_valid_ = light;
+  valid_ = speed && light;
   if (validity)
-    validity(true);
+    validity(valid_);
+  if (confidence)
+    confidence(speed, light);
+}
+
+std::string Controller::inferred_mode() const {
+  if (speed_valid_)
+    return mode_name({mode_.speed, false}) +
+           (light_valid_ ? (mode_.light ? "_light" : "") : "_light_unknown");
+  if (light_valid_)
+    return mode_.light ? "speed_unknown_light_on" : "speed_unknown_light_off";
+  return "unknown";
+}
+
+void Controller::confirm_(bool speed_known, int speed, bool light_known, bool light, uint32_t now) {
+  const Mode previous = mode_;
+  bool speed_valid = speed_valid_, light_valid = light_valid_;
+  if (!speed_known) {
+    speed_count_ = 0;
+    speed_valid = false;
+  } else {
+    if (speed != mode_.speed)
+      speed_valid = false;
+    if (!speed_count_ || speed != candidate_.speed) {
+      candidate_.speed = speed;
+      speed_count_ = 1;
+    } else {
+      speed_count_ = 2;
+      mode_.speed = speed;
+      speed_valid = true;
+    }
+  }
+  if (!light_known) {
+    light_count_ = 0;
+    light_valid = false;
+  } else {
+    if (light != mode_.light)
+      light_valid = false;
+    if (!light_count_ || light != candidate_.light) {
+      candidate_.light = light;
+      light_count_ = 1;
+    } else {
+      light_count_ = 2;
+      mode_.light = light;
+      light_valid = true;
+    }
+  }
+  if ((speed_valid || light_valid) && (!has_observation_ || mode_ != previous)) {
+    has_observation_ = true;
+    if (observed)
+      observed(mode_);
+  }
+  set_confidence_(speed_valid, light_valid);
   if (active_) {
-    if (mode == before_)
-      return;  // Missed command: await deadline, do not resend.
-    if (mode != expected_) {
+    if (target_kind_ == Target::SPEED ? !speed_valid_ : !light_valid_)
+      return;
+    const bool unchanged = target_kind_ == Target::SPEED ? mode_.speed == before_.speed : mode_.light == before_.light;
+    if (unchanged)
+      return;
+    const bool expected = target_kind_ == Target::SPEED ? mode_.speed == expected_.speed : mode_.light == expected_.light;
+    if (!expected) {
       active_ = false;
       set_status_("unexpected_state");
       return;
     }
-    if (mode == target_) {
+    const bool reached = target_kind_ == Target::SPEED ? mode_.speed == target_.speed : mode_.light == target_.light;
+    if (reached) {
       active_ = false;
       set_status_("confirmed");
     } else {
       next_step_(now);
     }
-  } else if (status_ == "waiting_for_feedback" || status_ == "raw_sent" || status_ == "uncalibrated" ||
+  } else if (!speed_known || !light_known) {
+    if (status_ != "confirmation_timeout" && status_ != "transmission_failed" &&
+        status_ != "unexpected_state" && status_ != "transmitter_timeout")
+      set_status_("ambiguous_power");
+  } else if (valid_ && (status_ == "waiting_for_feedback" || status_ == "raw_sent" || status_ == "uncalibrated" ||
              status_ == "feedback_disconnected" || status_ == "feedback_stale" || status_ == "invalid_power" ||
-             status_ == "unrecognized_power" || status_ == "ambiguous_power" || status_ == "missing_power_window") {
+             status_ == "unrecognized_power" || status_ == "ambiguous_power" || status_ == "missing_power_window" ||
+             status_ == "light_unconfirmed" || status_ == "already_satisfied_unconfirmed")) {
     set_status_("ready");
   }
 }
 
-bool Controller::request_(Mode target, uint32_t now) {
+bool Controller::request_(Mode target, Target kind, uint32_t now) {
   tick(now);
   if (busy()) {
     set_status_("rejected_busy");
     return false;
   }
-  if (!valid_ || !calibrated()) {
+  const bool known = kind == Target::SPEED ? speed_valid_ : light_valid_;
+  const bool light_fallback = kind == Target::LIGHT && allow_unconfirmed_light && speed_valid_;
+  if (!calibrated() || (!known && !light_fallback)) {
     set_status_("rejected_invalid_feedback");
     return false;
   }
-  if (target == mode_) {
-    set_status_("already_satisfied");
+  const bool satisfied = kind == Target::SPEED ? target.speed == mode_.speed : target.light == mode_.light;
+  if (satisfied) {
+    set_status_(known ? "already_satisfied" : "already_satisfied_unconfirmed");
     return true;
   }
   target_ = target;
+  target_kind_ = kind;
+  unconfirmed_light_request_ = kind == Target::LIGHT && allow_unconfirmed_light;
   active_ = true;
   next_step_(now);
   return true;
@@ -231,19 +298,19 @@ bool Controller::request_speed(int speed, uint32_t now) {
     set_status_("rejected_speed");
     return false;
   }
-  return request_({speed, mode_.light}, now);
+  return request_({speed, mode_.light}, Target::SPEED, now);
 }
 
 bool Controller::request_light(bool light, uint32_t now) {
   tick(now);
-  return request_({mode_.speed, light}, now);
+  return request_({mode_.speed, light}, Target::LIGHT, now);
 }
 
 void Controller::next_step_(uint32_t now) {
   before_ = mode_;
   expected_ = mode_;
   Command command;
-  if (target_.speed != mode_.speed) {
+  if (target_kind_ == Target::SPEED) {
     bool up = target_.speed > mode_.speed;
     expected_.speed += up ? 1 : -1;
     command = up ? Command::PLUS : Command::MINUS;
@@ -255,9 +322,7 @@ void Controller::next_step_(uint32_t now) {
 }
 
 void Controller::send_(Command command, uint32_t now) {
-  valid_ = false;
-  if (validity)
-    validity(false);
+  set_confidence_(false, false);
   reset_window_(now);
   transmitting_ = true;
   transmitted_target_ = active_;
@@ -274,6 +339,7 @@ bool Controller::raw(Command command, uint32_t now) {
     return false;
   }
   active_ = false;
+  unconfirmed_light_request_ = false;
   if (transmitting_) {
     // One bounded pending manual press. Finish the in-flight waveform first.
     pending_raw_ = true;
@@ -303,6 +369,18 @@ void Controller::transmission_done(uint32_t now, bool success) {
   completed_at_ = now;
   settling_ = true;
   reset_window_(now);
+  if (active_ && unconfirmed_light_request_) {
+    // The user explicitly chose remembered-state light control. RF completion
+    // is an assumption, not reception proof; never mark it as verified.
+    mode_.light = target_.light;
+    active_ = false;
+    unconfirmed_light_request_ = false;
+    if (observed)
+      observed(mode_);
+    set_confidence_(false, false);
+    set_status_("light_unconfirmed");
+    return;
+  }
   // Preserve an in-flight target's feedback failure instead of calling it a
   // successful raw press when its waveform eventually finishes.
   if (active_)

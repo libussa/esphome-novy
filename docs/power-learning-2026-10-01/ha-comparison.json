@@ -1,0 +1,507 @@
+{
+  "ha_version": "2026.9.3",
+  "ha_history_points": 41,
+  "direct_samples": 850,
+  "ha_gap_s": {
+    "min": 1.0295400619506836,
+    "median": 31.394877076148987,
+    "max": 92.6563229560852
+  },
+  "runs": [
+    {
+      "run": "fan_0_dark",
+      "direct_steady_samples": 40,
+      "direct_range_w": [
+        0.0,
+        0.0
+      ],
+      "ha_steady_records": 0,
+      "ha_range_w": null,
+      "direct_value_changes": 0
+    },
+    {
+      "run": "fan_0_dark_final",
+      "direct_steady_samples": 30,
+      "direct_range_w": [
+        0.0,
+        0.0
+      ],
+      "ha_steady_records": 0,
+      "ha_range_w": null,
+      "direct_value_changes": 0
+    },
+    {
+      "run": "fan_0_light",
+      "direct_steady_samples": 40,
+      "direct_range_w": [
+        6.9,
+        7.0
+      ],
+      "ha_steady_records": 0,
+      "ha_range_w": null,
+      "direct_value_changes": 16
+    },
+    {
+      "run": "fan_1_dark",
+      "direct_steady_samples": 40,
+      "direct_range_w": [
+        83.6,
+        85.7
+      ],
+      "ha_steady_records": 1,
+      "ha_range_w": [
+        85.6,
+        85.6
+      ],
+      "direct_value_changes": 24
+    },
+    {
+      "run": "fan_1_dark_repeat",
+      "direct_steady_samples": 30,
+      "direct_range_w": [
+        78.0,
+        79.8
+      ],
+      "ha_steady_records": 0,
+      "ha_range_w": null,
+      "direct_value_changes": 16
+    },
+    {
+      "run": "fan_1_light",
+      "direct_steady_samples": 40,
+      "direct_range_w": [
+        93.5,
+        94.7
+      ],
+      "ha_steady_records": 2,
+      "ha_range_w": [
+        93.8,
+        94.4
+      ],
+      "direct_value_changes": 23
+    },
+    {
+      "run": "fan_1_light_repeat",
+      "direct_steady_samples": 30,
+      "direct_range_w": [
+        85.3,
+        85.6
+      ],
+      "ha_steady_records": 1,
+      "ha_range_w": [
+        85.4,
+        85.4
+      ],
+      "direct_value_changes": 20
+    },
+    {
+      "run": "fan_2_dark",
+      "direct_steady_samples": 40,
+      "direct_range_w": [
+        146.5,
+        148.6
+      ],
+      "ha_steady_records": 1,
+      "ha_range_w": [
+        148.6,
+        148.6
+      ],
+      "direct_value_changes": 29
+    },
+    {
+      "run": "fan_2_dark_repeat",
+      "direct_steady_samples": 30,
+      "direct_range_w": [
+        140.8,
+        141.6
+      ],
+      "ha_steady_records": 0,
+      "ha_range_w": null,
+      "direct_value_changes": 13
+    },
+    {
+      "run": "fan_2_light",
+      "direct_steady_samples": 40,
+      "direct_range_w": [
+        144.6,
+        152.0
+      ],
+      "ha_steady_records": 0,
+      "ha_range_w": null,
+      "direct_value_changes": 26
+    },
+    {
+      "run": "fan_2_light_repeat",
+      "direct_steady_samples": 30,
+      "direct_range_w": [
+        146.3,
+        146.8
+      ],
+      "ha_steady_records": 1,
+      "ha_range_w": [
+        146.6,
+        146.6
+      ],
+      "direct_value_changes": 23
+    },
+    {
+      "run": "fan_3_dark",
+      "direct_steady_samples": 40,
+      "direct_range_w": [
+        208.4,
+        210.5
+      ],
+      "ha_steady_records": 1,
+      "ha_range_w": [
+        210.1,
+        210.1
+      ],
+      "direct_value_changes": 30
+    },
+    {
+      "run": "fan_3_dark_repeat",
+      "direct_steady_samples": 30,
+      "direct_range_w": [
+        206.7,
+        208.4
+      ],
+      "ha_steady_records": 0,
+      "ha_range_w": null,
+      "direct_value_changes": 21
+    },
+    {
+      "run": "fan_3_light",
+      "direct_steady_samples": 40,
+      "direct_range_w": [
+        215.6,
+        218.0
+      ],
+      "ha_steady_records": 1,
+      "ha_range_w": [
+        216.1,
+        216.1
+      ],
+      "direct_value_changes": 31
+    },
+    {
+      "run": "fan_3_light_repeat",
+      "direct_steady_samples": 30,
+      "direct_range_w": [
+        212.5,
+        214.7
+      ],
+      "ha_steady_records": 0,
+      "ha_range_w": null,
+      "direct_value_changes": 24
+    },
+    {
+      "run": "fan_4_dark",
+      "direct_steady_samples": 40,
+      "direct_range_w": [
+        228.0,
+        230.7
+      ],
+      "ha_steady_records": 1,
+      "ha_range_w": [
+        228.3,
+        228.3
+      ],
+      "direct_value_changes": 36
+    },
+    {
+      "run": "fan_4_light",
+      "direct_steady_samples": 40,
+      "direct_range_w": [
+        235.1,
+        236.3
+      ],
+      "ha_steady_records": 0,
+      "ha_range_w": null,
+      "direct_value_changes": 30
+    }
+  ],
+  "timing_tolerant_value_matches": [
+    {
+      "ha_time": "2026-10-01T00:24:32.656323+02:00",
+      "watts": 5.3,
+      "rpc_time": "2026-09-30T22:24:32.803950+00:00",
+      "rpc_watts": 5.3,
+      "delta_s": 0.148,
+      "error_w": 0.0,
+      "run": "fan_0_light"
+    },
+    {
+      "ha_time": "2026-10-01T00:24:33.685863+02:00",
+      "watts": 6.9,
+      "rpc_time": "2026-09-30T22:24:33.799961+00:00",
+      "rpc_watts": 6.9,
+      "delta_s": 0.114,
+      "error_w": 0.0,
+      "run": "fan_0_light"
+    },
+    {
+      "ha_time": "2026-10-01T00:25:35.433678+02:00",
+      "watts": 98.8,
+      "rpc_time": "2026-09-30T22:25:36.269956+00:00",
+      "rpc_watts": 98.8,
+      "delta_s": 0.836,
+      "error_w": 0.0,
+      "run": "fan_1_light"
+    },
+    {
+      "ha_time": "2026-10-01T00:26:00.054333+02:00",
+      "watts": 94.4,
+      "rpc_time": "2026-09-30T22:25:59.277123+00:00",
+      "rpc_watts": 94.4,
+      "delta_s": -0.777,
+      "error_w": 0.0,
+      "run": "fan_1_light"
+    },
+    {
+      "ha_time": "2026-10-01T00:26:15.537361+02:00",
+      "watts": 93.8,
+      "rpc_time": "2026-09-30T22:26:16.279502+00:00",
+      "rpc_watts": 93.8,
+      "delta_s": 0.742,
+      "error_w": 0.0,
+      "run": "fan_1_light"
+    },
+    {
+      "ha_time": "2026-10-01T00:27:33.699481+02:00",
+      "watts": 84.5,
+      "rpc_time": "2026-09-30T22:27:34.646233+00:00",
+      "rpc_watts": 84.5,
+      "delta_s": 0.947,
+      "error_w": 0.0,
+      "run": "fan_1_dark"
+    },
+    {
+      "ha_time": "2026-10-01T00:28:00.053698+02:00",
+      "watts": 85.6,
+      "rpc_time": "2026-09-30T22:27:58.638216+00:00",
+      "rpc_watts": 85.6,
+      "delta_s": -1.415,
+      "error_w": 0.0,
+      "run": "fan_1_dark"
+    },
+    {
+      "ha_time": "2026-10-01T00:30:42.926914+02:00",
+      "watts": 95.5,
+      "rpc_time": "2026-09-30T22:30:43.706616+00:00",
+      "rpc_watts": 95.5,
+      "delta_s": 0.78,
+      "error_w": 0.0,
+      "run": "fan_2_dark"
+    },
+    {
+      "ha_time": "2026-10-01T00:30:43.956890+02:00",
+      "watts": 148.1,
+      "rpc_time": "2026-09-30T22:30:44.715973+00:00",
+      "rpc_watts": 148.1,
+      "delta_s": 0.759,
+      "error_w": 0.0,
+      "run": "fan_2_dark"
+    },
+    {
+      "ha_time": "2026-10-01T00:31:00.050128+02:00",
+      "watts": 148.6,
+      "rpc_time": "2026-09-30T22:30:58.713134+00:00",
+      "rpc_watts": 148.6,
+      "delta_s": -1.337,
+      "error_w": 0.0,
+      "run": "fan_2_dark"
+    },
+    {
+      "ha_time": "2026-10-01T00:32:00.050722+02:00",
+      "watts": 152.0,
+      "rpc_time": "2026-09-30T22:31:59.325066+00:00",
+      "rpc_watts": 152.0,
+      "delta_s": -0.726,
+      "error_w": 0.0,
+      "run": "fan_2_light"
+    },
+    {
+      "ha_time": "2026-10-01T00:33:19.317912+02:00",
+      "watts": 199.8,
+      "rpc_time": "2026-09-30T22:33:20.240354+00:00",
+      "rpc_watts": 199.8,
+      "delta_s": 0.922,
+      "error_w": 0.0,
+      "run": "fan_3_light"
+    },
+    {
+      "ha_time": "2026-10-01T00:33:20.356082+02:00",
+      "watts": 220.9,
+      "rpc_time": "2026-09-30T22:33:21.234604+00:00",
+      "rpc_watts": 220.9,
+      "delta_s": 0.879,
+      "error_w": 0.0,
+      "run": "fan_3_light"
+    },
+    {
+      "ha_time": "2026-10-01T00:34:00.047016+02:00",
+      "watts": 216.1,
+      "rpc_time": "2026-09-30T22:34:00.241404+00:00",
+      "rpc_watts": 216.1,
+      "delta_s": 0.194,
+      "error_w": 0.0,
+      "run": "fan_3_light"
+    },
+    {
+      "ha_time": "2026-10-01T00:34:36.482553+02:00",
+      "watts": 208.1,
+      "rpc_time": "2026-09-30T22:34:37.308470+00:00",
+      "rpc_watts": 208.1,
+      "delta_s": 0.826,
+      "error_w": 0.0,
+      "run": "fan_3_dark"
+    },
+    {
+      "ha_time": "2026-10-01T00:35:00.043602+02:00",
+      "watts": 210.1,
+      "rpc_time": "2026-09-30T22:34:59.311708+00:00",
+      "rpc_watts": 210.1,
+      "delta_s": -0.732,
+      "error_w": 0.0,
+      "run": "fan_3_dark"
+    },
+    {
+      "ha_time": "2026-10-01T00:35:42.306158+02:00",
+      "watts": 249.2,
+      "rpc_time": "2026-09-30T22:35:42.457543+00:00",
+      "rpc_watts": 249.2,
+      "delta_s": 0.151,
+      "error_w": 0.0,
+      "run": "fan_4_dark"
+    },
+    {
+      "ha_time": "2026-10-01T00:35:43.335992+02:00",
+      "watts": 228.6,
+      "rpc_time": "2026-09-30T22:35:43.460605+00:00",
+      "rpc_watts": 228.6,
+      "delta_s": 0.125,
+      "error_w": 0.0,
+      "run": "fan_4_dark"
+    },
+    {
+      "ha_time": "2026-10-01T00:36:00.088563+02:00",
+      "watts": 228.3,
+      "rpc_time": "2026-09-30T22:36:00.466510+00:00",
+      "rpc_watts": 228.3,
+      "delta_s": 0.378,
+      "error_w": 0.0,
+      "run": "fan_4_dark"
+    },
+    {
+      "ha_time": "2026-10-01T00:37:00.091760+02:00",
+      "watts": 235.5,
+      "rpc_time": "2026-09-30T22:36:58.891891+00:00",
+      "rpc_watts": 235.5,
+      "delta_s": -1.2,
+      "error_w": 0.0,
+      "run": "fan_4_light"
+    },
+    {
+      "ha_time": "2026-10-01T00:38:04.249566+02:00",
+      "watts": 210.2,
+      "rpc_time": "2026-09-30T22:38:04.528106+00:00",
+      "rpc_watts": 210.2,
+      "delta_s": 0.279,
+      "error_w": 0.0,
+      "run": "fan_3_light_repeat"
+    },
+    {
+      "ha_time": "2026-10-01T00:39:00.086015+02:00",
+      "watts": 208.2,
+      "rpc_time": "2026-09-30T22:38:59.449550+00:00",
+      "rpc_watts": 208.2,
+      "delta_s": -0.636,
+      "error_w": 0.0,
+      "run": "fan_3_dark_repeat"
+    },
+    {
+      "ha_time": "2026-10-01T00:40:03.552772+02:00",
+      "watts": 140.5,
+      "rpc_time": "2026-09-30T22:40:03.904733+00:00",
+      "rpc_watts": 140.5,
+      "delta_s": 0.352,
+      "error_w": 0.0,
+      "run": "fan_2_dark_repeat"
+    },
+    {
+      "ha_time": "2026-10-01T00:42:00.082390+02:00",
+      "watts": 146.6,
+      "rpc_time": "2026-09-30T22:42:00.600402+00:00",
+      "rpc_watts": 146.6,
+      "delta_s": 0.518,
+      "error_w": 0.0,
+      "run": "fan_2_light_repeat"
+    },
+    {
+      "ha_time": "2026-10-01T00:42:36.795666+02:00",
+      "watts": 110.7,
+      "rpc_time": "2026-09-30T22:42:37.120594+00:00",
+      "rpc_watts": 110.7,
+      "delta_s": 0.325,
+      "error_w": 0.0,
+      "run": "fan_1_light_repeat"
+    },
+    {
+      "ha_time": "2026-10-01T00:42:37.826631+02:00",
+      "watts": 85.2,
+      "rpc_time": "2026-09-30T22:42:38.120618+00:00",
+      "rpc_watts": 85.2,
+      "delta_s": 0.294,
+      "error_w": 0.0,
+      "run": "fan_1_light_repeat"
+    },
+    {
+      "ha_time": "2026-10-01T00:43:00.079257+02:00",
+      "watts": 85.4,
+      "rpc_time": "2026-09-30T22:43:00.125887+00:00",
+      "rpc_watts": 85.4,
+      "delta_s": 0.047,
+      "error_w": 0.0,
+      "run": "fan_1_light_repeat"
+    },
+    {
+      "ha_time": "2026-10-01T00:44:05.277390+02:00",
+      "watts": 79.3,
+      "rpc_time": "2026-09-30T22:44:05.794220+00:00",
+      "rpc_watts": 79.3,
+      "delta_s": 0.517,
+      "error_w": 0.0,
+      "run": "fan_1_dark_repeat"
+    },
+    {
+      "ha_time": "2026-10-01T00:45:16.242395+02:00",
+      "watts": 24.5,
+      "rpc_time": "2026-09-30T22:45:16.267266+00:00",
+      "rpc_watts": 24.5,
+      "delta_s": 0.025,
+      "error_w": 0.0,
+      "run": "fan_0_dark_final"
+    },
+    {
+      "ha_time": "2026-10-01T00:45:17.288522+02:00",
+      "watts": 0.0,
+      "rpc_time": "2026-09-30T22:45:18.250087+00:00",
+      "rpc_watts": 0.0,
+      "delta_s": 0.962,
+      "error_w": 0.0,
+      "run": "fan_0_dark_final"
+    }
+  ],
+  "matching_rule": "For each HA update with direct samples within +/-1.5 seconds, compare with the closest value in that interval; this allows meter acquisition phase and transport jitter.",
+  "source_review": {
+    "home_assistant": "2026.9.3",
+    "aioshelly": "13.32.0",
+    "platform": "shelly",
+    "power_field": "switch:0.apower",
+    "integration_options": {},
+    "display_precision": 0,
+    "value_averaging_found": false,
+    "notification_throttle_found_in_ha_or_aioshelly": false,
+    "shelly_reporting_threshold": "not established by this audit"
+  }
+}

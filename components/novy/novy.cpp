@@ -79,7 +79,13 @@ void NovyComponent::setup() {
   };
   controller_.validity = [this](bool valid) {
     valid_->publish_state(valid);
-    mode_->publish_state(valid ? mode_name(controller_.mode()) : "unknown");
+    mode_->publish_state(controller_.inferred_mode());
+  };
+  controller_.confidence = [this](bool speed, bool light) {
+    if (speed_valid_ != nullptr)
+      speed_valid_->publish_state(speed);
+    if (light_valid_ != nullptr)
+      light_valid_->publish_state(light);
   };
   controller_.status = [this](const std::string &value) {
     ESP_LOGI(TAG, "%s", value.c_str());
@@ -129,7 +135,8 @@ void NovyComponent::send_(Command command) {
   }
   auto call = transmitter_->transmit();
   call.get_data()->set_carrier_frequency(0);
-  call.get_data()->set_data(waveform(command, pairing_code_));
+  call.get_data()->set_data(command == Command::POWER && !power_waveform_.empty()
+                               ? power_waveform_ : waveform(command, pairing_code_));
   call.perform();
 }
 
@@ -141,5 +148,6 @@ void NovyComponent::transmission_done() {
 void NovyComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Novy controller: pairing code %u, calibration %s", pairing_code_,
                 controller_.calibrated() ? "complete" : "missing");
+  ESP_LOGCONFIG(TAG, "  Power waveform: %s", power_waveform_.empty() ? "built-in" : "captured override");
 }
 }  // namespace esphome::novy

@@ -35,8 +35,10 @@ class Controller {
   std::function<void(Command)> transmit;
   std::function<void(Mode)> observed;
   std::function<void(bool)> validity;
+  std::function<void(bool, bool)> confidence;
   std::function<void(const std::string &)> status;
   std::function<void(float)> averaged;
+  bool allow_unconfirmed_light{false};
 
   void start(uint32_t now);
   void sample(float watts, uint32_t now);
@@ -47,6 +49,9 @@ class Controller {
   bool raw(Command command, uint32_t now);
   void transmission_done(uint32_t now, bool success);
   bool valid() const { return valid_; }
+  bool speed_valid() const { return speed_valid_; }
+  bool light_valid() const { return light_valid_; }
+  std::string inferred_mode() const;
   bool has_observation() const { return has_observation_; }
   bool busy() const { return active_ || transmitting_ || pending_raw_; }
   bool calibrated() const;
@@ -58,18 +63,22 @@ class Controller {
   void set_status_(const char *value);
   void invalidate_(const char *reason, uint32_t now);
   void reset_window_(uint32_t now);
-  bool request_(Mode target, uint32_t now);
+  enum class Target { SPEED, LIGHT };
+  void set_confidence_(bool speed, bool light);
+  bool request_(Mode target, Target kind, uint32_t now);
   void next_step_(uint32_t now);
   void send_(Command command, uint32_t now);
-  void confirm_(Mode mode, uint32_t now);
+  void confirm_(bool speed_known, int speed, bool light_known, bool light, uint32_t now);
 
   Mode mode_{}, target_{}, before_{}, expected_{}, candidate_{};
   bool valid_{false}, has_observation_{false}, seen_sample_{false};
+  bool speed_valid_{false}, light_valid_{false}, unconfirmed_light_request_{false};
+  Target target_kind_{Target::SPEED};
   bool stale_announced_{false};
   bool active_{false}, transmitting_{false}, settling_{false}, pending_raw_{false};
   bool transmitted_target_{false};
   Command raw_command_{Command::LIGHT};
-  uint8_t candidate_count_{0};
+  uint8_t speed_count_{0}, light_count_{0};
   uint32_t last_sample_{0}, window_start_{0}, sent_at_{0}, completed_at_{0};
   double sum_{0};
   uint32_t samples_{0};

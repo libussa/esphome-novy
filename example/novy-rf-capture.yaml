@@ -1,0 +1,31 @@
+# Optional diagnostic package for novy-7831-azdelivery.yaml.
+# Add to the main configuration:
+# packages:
+#   rf_capture: !include novy-rf-capture.yaml
+# If the main config declares logger.level, set that to DEBUG too:
+# main-config values override package values.
+#
+# Power off before wiring a 433 MHz SRX882S receiver:
+# VCC -> 3.3V, CS -> 3.3V (required), GND -> GND, DATA -> GPIO27.
+# Attach a 433 MHz antenna to ANT. Follow the printed pad labels, not
+# left/right positions: viewing the other side reverses their order.
+# This package only listens; received signals never trigger transmission.
+
+logger:
+  level: DEBUG
+
+remote_receiver:
+  id: novy_capture
+  pin:
+    number: GPIO27
+    mode: INPUT
+  dump:
+    - raw
+    - rc_switch
+  # Keep the approximately 11.5 ms Novy sync gap inside a capture.
+  idle: 20ms
+  filter: 100us
+  buffer_size: 20kB
+  # Classic ESP32 has 512 shared RMT symbols; TX uses the other 64.
+  rmt_symbols: 448
+  receive_symbols: 448

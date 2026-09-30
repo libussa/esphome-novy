@@ -1,0 +1,2 @@
+{"utc": "2026-09-30T22:54:07.845067+00:00", "method": "RPC response", "device_ts": null, "watts": 0.0, "voltage": 235.4, "relay": true}
+{"utc": "2026-09-30T22:55:00.118725+00:00", "method": "NotifyStatus", "device_ts": 1790808900.03, "watts": 0.0, "voltage": 233.2, "relay": null}

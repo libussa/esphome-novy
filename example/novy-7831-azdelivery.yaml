@@ -1,0 +1,115 @@
+substitutions:
+  name: novy-7831
+  friendly_name: Novy Hood
+  data_pin: GPIO4
+  pairing_code: "1"
+  # This installation's Shelly Plug M Gen3; reserve its address in DHCP.
+  shelly_status_url: http://10.10.10.183/rpc/Shelly.GetStatus
+  shelly_mac: 70AF09E08A6C
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2026.9.0
+
+# AZDelivery ESP32 NodeMCU Dev Kit C with CP2102 (ESP32-WROOM-32).
+esp32:
+  board: esp32dev
+  flash_size: 4MB
+  framework:
+    type: esp-idf
+    version: 5.5.5
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  reboot_timeout: 0s
+
+api:
+  reboot_timeout: 0s
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    # Encrypted OTA shares the native API key in ESPHome 2026.9.
+    encryption:
+
+logger:
+  level: INFO
+  hardware_uart: UART0
+
+# Power waveform verified on this hood with the original remote's pairing code 1.
+packages:
+  power_replay: !include novy-power-waveform.yaml
+  measured_power: !include novy-shelly-power.yaml
+  power_calibration: !include novy-power-calibration.yaml
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [novy]
+
+# STX882 DATA -> GPIO4, VCC -> 3.3V, GND -> GND.
+remote_transmitter:
+  id: novy_rf
+  pin: ${data_pin}
+  carrier_duty_percent: 100%
+  non_blocking: true
+  eot_level: false
+
+sensor:
+  - platform: template
+    id: hood_power
+    name: Novy measured power
+    update_interval: never
+    internal: true
+    unit_of_measurement: W
+    device_class: power
+    state_class: measurement
+    # Each HTTP response supplies a fresh sample, including unchanged watts.
+    # Failed requests publish NaN immediately; cached values are never repeated.
+
+novy:
+  id: hood
+  transmitter_id: novy_rf
+  power_sensor_id: hood_power
+  pairing_code: ${pairing_code}
+  averaging_window: 2s
+  stale_timeout: 10s
+  settle_time: 2s
+  step_timeout: 15s
+  light_on_ambiguity: last_known
+  # Installation-specific measured ranges come from the calibration package.
+  # Fan confidence is independent of light ambiguity; see ../docs/power-learning.md.
+  fan:
+    name: Novy Fan
+  light:
+    name: Novy Light
+    restore_mode: ALWAYS_OFF
+  raw_buttons:
+    power:
+      name: Novy Raw power
+    light:
+      name: Novy Raw light
+    plus:
+      name: Novy Raw speed up
+    minus:
+      name: Novy Raw speed down
+    novy:
+      name: Novy Raw Novy
+  average_power:
+    name: Novy Average power
+  reading_age:
+    name: Novy Reading age
+  feedback_valid:
+    name: Novy Feedback valid
+  fan_feedback_valid:
+    name: Novy Fan feedback valid
+  light_feedback_valid:
+    name: Novy Light feedback valid
+  inferred_mode:
+    name: Novy Inferred mode
+  command_status:
+    name: Novy Command status

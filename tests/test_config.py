@@ -59,8 +59,31 @@ class ConfigTests(unittest.TestCase):
     def test_commissioning_example(self):
         self.check()
 
+    def test_captured_power_waveform_codegen(self):
+        self.check(lambda t: t.replace("calibration: []",
+                   "power_waveform: [-12420, 370, -400, 720, -760, 370, -16220]\n  calibration: []"),
+                   generate=True)
+
+    def test_invalid_power_waveform(self):
+        for pulses, error in (("[-400, 0]", "non-zero"),
+                              ("[-400, -720]", "alternate"),
+                              ("[-70000, 370]", "value must be"),
+                              ("[-400]", "at least")):
+            with self.subTest(pulses=pulses):
+                self.check(lambda t: t.replace("calibration: []",
+                           f"power_waveform: {pulses}\n  calibration: []"), error)
+
     def test_full_calibration_codegen(self):
         self.check(lambda t: t.replace("calibration: []", calibration()), generate=True)
+
+    def test_partial_feedback_and_light_fallback_codegen(self):
+        self.check(lambda t: t.replace("calibration: []", calibration() +
+                   "\n  light_on_ambiguity: last_known\n  fan_feedback_valid:\n    name: Fan feedback\n"
+                   "  light_feedback_valid:\n    name: Light feedback"), generate=True)
+
+    def test_invalid_light_fallback(self):
+        self.check(lambda t: t.replace("calibration: []", "calibration: []\n  light_on_ambiguity: guess"),
+                   "Unknown value")
 
     def test_pairing_code_bounds(self):
         for code in ("0", "11"):

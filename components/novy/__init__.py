@@ -74,16 +74,31 @@ def duration(value):
     return value
 
 
+def validate_power_waveform(pulses):
+    if any(value == 0 for value in pulses):
+        raise cv.Invalid("Power waveform pulses must be non-zero")
+    if any((a > 0) == (b > 0) for a, b in zip(pulses, pulses[1:])):
+        raise cv.Invalid("Power waveform pulses must alternate between high and low")
+    if sum(abs(value) for value in pulses) > 5000000:
+        raise cv.Invalid("Power waveform must finish within five seconds")
+    return pulses
+
+
 CONFIG_SCHEMA = cv.All(cv.Schema({
     cv.GenerateID(): cv.declare_id(NovyComponent),
     cv.Required("transmitter_id"): cv.use_id(remote_transmitter.RemoteTransmitterComponent),
     cv.Required("power_sensor_id"): cv.use_id(sensor.Sensor),
     cv.Optional("pairing_code", default=1): cv.int_range(min=1, max=10),
+    # Complete measured button press, including its pairing bits and repeats.
+    cv.Optional("power_waveform"): cv.All(
+        cv.ensure_list(cv.int_range(min=-65535, max=65535)),
+        cv.Length(min=2, max=4096), validate_power_waveform),
     cv.Optional("calibration", default=[]): cv.All(cv.ensure_list(ENTRY), validate_calibration),
     cv.Optional("averaging_window", default="3s"): duration,
     cv.Optional("stale_timeout", default="30s"): duration,
     cv.Optional("settle_time", default="3s"): duration,
     cv.Optional("step_timeout", default="30s"): duration,
+    cv.Optional("light_on_ambiguity", default="reject"): cv.one_of("reject", "last_known", lower=True),
     cv.Required("fan"): fan.fan_schema(NovyFan, default_restore_mode="NO_RESTORE"),
     cv.Required("light"): light.light_schema(NovyLight, light.LightType.BINARY, default_restore_mode="ALWAYS_OFF"),
     cv.Required("raw_buttons"): cv.Schema({
@@ -95,6 +110,8 @@ CONFIG_SCHEMA = cv.All(cv.Schema({
     cv.Required("reading_age"): sensor.sensor_schema(unit_of_measurement="s", accuracy_decimals=0,
                                                    entity_category="diagnostic"),
     cv.Required("feedback_valid"): binary_sensor.binary_sensor_schema(entity_category="diagnostic"),
+    cv.Optional("fan_feedback_valid"): binary_sensor.binary_sensor_schema(entity_category="diagnostic"),
+    cv.Optional("light_feedback_valid"): binary_sensor.binary_sensor_schema(entity_category="diagnostic"),
     cv.Required("inferred_mode"): text_sensor.text_sensor_schema(entity_category="diagnostic"),
     cv.Required("command_status"): text_sensor.text_sensor_schema(entity_category="diagnostic"),
 }).extend(cv.COMPONENT_SCHEMA), validate_settings)
@@ -122,6 +139,9 @@ async def to_code(config):
     cg.add(var.set_transmitter(await cg.get_variable(config["transmitter_id"])))
     cg.add(var.set_power_sensor(await cg.get_variable(config["power_sensor_id"])))
     cg.add(var.set_pairing_code(config["pairing_code"]))
+    cg.add(var.set_allow_unconfirmed_light(config["light_on_ambiguity"] == "last_known"))
+    if "power_waveform" in config:
+        cg.add(var.set_power_waveform(config["power_waveform"]))
     cg.add(var.set_timing(*(config[key].total_milliseconds for key in
                            ("averaging_window", "stale_timeout", "settle_time", "step_timeout"))))
     for entry in config["calibration"]:
@@ -136,5 +156,9 @@ async def to_code(config):
     for key, setter in (("average_power", "set_average_sensor"), ("reading_age", "set_age_sensor")):
         cg.add(getattr(var, setter)(await sensor.new_sensor(config[key])))
     cg.add(var.set_valid_sensor(await binary_sensor.new_binary_sensor(config["feedback_valid"])))
+    for key, setter in (("fan_feedback_valid", "set_speed_valid_sensor"),
+                        ("light_feedback_valid", "set_light_valid_sensor")):
+        if key in config:
+            cg.add(getattr(var, setter)(await binary_sensor.new_binary_sensor(config[key])))
     for key, setter in (("inferred_mode", "set_mode_sensor"), ("command_status", "set_status_sensor")):
         cg.add(getattr(var, setter)(await text_sensor.new_text_sensor(config[key])))

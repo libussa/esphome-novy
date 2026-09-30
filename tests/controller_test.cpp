@@ -210,7 +210,7 @@ void test_failures_and_interruption() {
   changed.confirm({1, false});
   changed.controller.request_speed(3, changed.now);
   changed.complete();
-  changed.confirm({2, true});  // Someone changed the light while fan step was pending.
+  changed.confirm({4, true});  // The fan skipped the expected speed 2.
   assert(!changed.controller.busy());
   assert(changed.controller.valid());
   assert(changed.controller.last_status() == "unexpected_state");
@@ -266,6 +266,115 @@ void test_failures_and_interruption() {
   assert(hung.sent.size() == 1);
 }
 
+void measured_ranges(Controller &controller) {
+  controller.calibration = {
+    {{0, false}, 0, 1}, {{0, true}, 5.9f, 8},
+    {{1, false}, 77, 86.7f}, {{1, true}, 84.3f, 95.7f},
+    {{2, false}, 139.8f, 149.6f}, {{2, true}, 143.6f, 153},
+    {{3, false}, 205.7f, 211.5f}, {{3, true}, 211.5f, 219},
+    {{4, false}, 227, 231.7f}, {{4, true}, 234.1f, 237.3f},
+  };
+}
+
+void test_independent_fan_feedback() {
+  Fixture f;
+  measured_ranges(f.controller);
+  f.window(85.5f);
+  assert(!f.controller.speed_valid());
+  f.window(85.5f); // Actual cold/dark or warm/lit speed 1, without a known light.
+  assert(f.controller.speed_valid() && !f.controller.light_valid());
+  assert(!f.controller.valid());
+  assert(f.controller.inferred_mode() == "fan_1_light_unknown");
+  assert(f.controller.request_speed(3, f.now));
+  assert(f.sent.back() == Command::PLUS);
+  f.complete();
+  f.window(146.6f); f.window(146.6f); // Speed 2 remains ambiguous only for light.
+  assert(f.sent.size() == 2 && f.sent.back() == Command::PLUS);
+  f.complete();
+  f.window(216); f.window(216);
+  assert(f.controller.mode().speed == 3 && !f.controller.busy());
+  assert(f.controller.last_status() == "confirmed");
+
+  Fixture independent;
+  independent.confirm({1, false});
+  independent.controller.request_speed(3, independent.now);
+  independent.complete();
+  independent.confirm({2, true}); // A light change does not prevent a fan step.
+  assert(independent.sent.size() == 2);
+  independent.complete();
+  independent.confirm({3, true});
+  assert(!independent.controller.busy());
+}
+
+void test_remembered_light_fallback() {
+  Fixture f;
+  measured_ranges(f.controller);
+  f.controller.allow_unconfirmed_light = true;
+  f.window(0); f.window(0); // Remember actual OFF before entering overlap.
+  f.window(85.5f); f.window(85.5f);
+  assert(!f.controller.light_valid() && f.controller.speed_valid());
+  assert(f.controller.request_light(true, f.now));
+  assert(!f.controller.mode().light); // No assumption until RF completes.
+  assert(f.sent.size() == 1 && f.sent.back() == Command::LIGHT);
+  f.complete();
+  assert(f.controller.mode().light && !f.controller.light_valid());
+  assert(!f.controller.busy());
+  f.window(85.5f); f.window(85.5f);
+  assert(f.controller.request_light(true, f.now));
+  assert(f.sent.size() == 1); // Same assumed target is a no-op, never a toggle.
+  assert(f.controller.last_status() == "already_satisfied_unconfirmed");
+  assert(f.controller.request_light(false, f.now));
+  f.complete();
+  assert(!f.controller.mode().light && !f.controller.light_valid());
+  f.window(94); f.window(94); // Actual observation corrects an assumption.
+  assert(f.controller.mode().light && f.controller.light_valid());
+  assert(f.sent.size() == 2);
+  f.controller.sample(NAN, f.now);
+  assert(!f.controller.request_light(false, f.now));
+  assert(!f.controller.request_speed(2, f.now));
+  assert(f.sent.size() == 2);
+
+  Fixture strict;
+  measured_ranges(strict.controller);
+  strict.window(85.5f); strict.window(85.5f);
+  assert(!strict.controller.request_light(true, strict.now));
+
+  Fixture failed;
+  failed.controller.allow_unconfirmed_light = true;
+  failed.confirm({0, false});
+  failed.controller.request_light(true, failed.now);
+  failed.controller.transmission_done(failed.now + 100, false);
+  assert(!failed.controller.mode().light); // Failed RF never updates assumption.
+}
+
+void test_motor_transients_and_fast_timing() {
+  Fixture f;
+  f.controller.timing = {2000, 10000, 2000, 15000};
+  auto window = [&](float watts) {
+    for (int i = 0; i < 2; ++i) {
+      f.controller.sample(watts, f.now);
+      f.now += 1000;
+      f.controller.tick(f.now);
+    }
+  };
+  window(watts({0, false})); window(watts({0, false}));
+  assert(f.controller.request_speed(1, f.now));
+  const uint32_t sent_at = f.now;
+  f.complete();
+  window(200); // Startup spike exceeds the calibrated range.
+  assert(f.controller.busy() && f.sent.size() == 1);
+  window(watts({1, false})); window(watts({1, false}));
+  assert(f.controller.speed_valid() && !f.controller.busy());
+  assert(f.now - sent_at == 9000); // RF + settle + transient + two windows.
+  assert(f.controller.last_status() == "confirmed");
+
+  assert(f.controller.request_speed(2, f.now));
+  f.complete();
+  for (int i = 0; i < 8; ++i) window(200);
+  assert(!f.controller.busy() && f.controller.last_status() == "confirmation_timeout");
+  assert(f.sent.size() == 2); // No retry and no next step through unknown power.
+}
+
 void test_wrap_and_settling() {
   Fixture f(true, std::numeric_limits<uint32_t>::max() - 3500);
   f.confirm({0, false});
@@ -289,5 +398,8 @@ int main() {
   test_light_targets_and_noop();
   test_failures_and_interruption();
   test_wrap_and_settling();
+  test_independent_fan_feedback();
+  test_remembered_light_fallback();
+  test_motor_transients_and_fast_timing();
   std::cout << "Controller and RF waveform tests passed\n";
 }

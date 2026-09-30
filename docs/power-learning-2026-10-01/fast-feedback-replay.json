@@ -1,0 +1,94 @@
+{
+  "timing": {
+    "window_ms": 2000,
+    "settle_ms": 2000,
+    "simulated_rf_ms": 800
+  },
+  "runs": [
+    {
+      "run": "fan_0_dark",
+      "first_confirmed_speed_ms": 7001,
+      "first_confirmed_light_ms": 7001
+    },
+    {
+      "run": "fan_0_dark_final",
+      "first_confirmed_speed_ms": 7001,
+      "first_confirmed_light_ms": 7001
+    },
+    {
+      "run": "fan_0_light",
+      "first_confirmed_speed_ms": 7001,
+      "first_confirmed_light_ms": 7001
+    },
+    {
+      "run": "fan_1_dark",
+      "first_confirmed_speed_ms": 7001,
+      "first_confirmed_light_ms": 15002
+    },
+    {
+      "run": "fan_1_dark_repeat",
+      "first_confirmed_speed_ms": 7003,
+      "first_confirmed_light_ms": 7003
+    },
+    {
+      "run": "fan_1_light",
+      "first_confirmed_speed_ms": 9002,
+      "first_confirmed_light_ms": 9002
+    },
+    {
+      "run": "fan_1_light_repeat",
+      "first_confirmed_speed_ms": 7001,
+      "first_confirmed_light_ms": null
+    },
+    {
+      "run": "fan_2_dark",
+      "first_confirmed_speed_ms": 7001,
+      "first_confirmed_light_ms": null
+    },
+    {
+      "run": "fan_2_dark_repeat",
+      "first_confirmed_speed_ms": 7001,
+      "first_confirmed_light_ms": 7001
+    },
+    {
+      "run": "fan_2_light",
+      "first_confirmed_speed_ms": 7001,
+      "first_confirmed_light_ms": 7001
+    },
+    {
+      "run": "fan_2_light_repeat",
+      "first_confirmed_speed_ms": 7001,
+      "first_confirmed_light_ms": null
+    },
+    {
+      "run": "fan_3_dark",
+      "first_confirmed_speed_ms": 7001,
+      "first_confirmed_light_ms": 7001
+    },
+    {
+      "run": "fan_3_dark_repeat",
+      "first_confirmed_speed_ms": 7001,
+      "first_confirmed_light_ms": 7001
+    },
+    {
+      "run": "fan_3_light",
+      "first_confirmed_speed_ms": 9002,
+      "first_confirmed_light_ms": 9002
+    },
+    {
+      "run": "fan_3_light_repeat",
+      "first_confirmed_speed_ms": 7001,
+      "first_confirmed_light_ms": 7001
+    },
+    {
+      "run": "fan_4_dark",
+      "first_confirmed_speed_ms": 7001,
+      "first_confirmed_light_ms": 7001
+    },
+    {
+      "run": "fan_4_light",
+      "first_confirmed_speed_ms": 7001,
+      "first_confirmed_light_ms": 7001
+    }
+  ]
+}

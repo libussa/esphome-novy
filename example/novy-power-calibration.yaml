@@ -1,0 +1,45 @@
+# Measured on this Novy 7831 on 2026-10-01; not a generic hood calibration.
+# Includes both initial and warm-motor readings with a 1 W margin.
+# Overlaps deliberately remain ambiguous; see ../docs/power-learning.md.
+novy:
+  calibration:
+    - speed: 0
+      light: false
+      min_power: 0.0
+      max_power: 1.0
+    - speed: 0
+      light: true
+      min_power: 5.9
+      max_power: 8.0
+    - speed: 1
+      light: false
+      min_power: 77.0
+      max_power: 86.7
+    - speed: 1
+      light: true
+      min_power: 84.3
+      max_power: 95.7
+    - speed: 2
+      light: false
+      min_power: 139.8
+      max_power: 149.6
+    - speed: 2
+      light: true
+      min_power: 143.6
+      max_power: 153.0
+    - speed: 3
+      light: false
+      min_power: 205.7
+      max_power: 211.5
+    - speed: 3
+      light: true
+      min_power: 211.5
+      max_power: 219.0
+    - speed: 4
+      light: false
+      min_power: 227.0
+      max_power: 231.7
+    - speed: 4
+      light: true
+      min_power: 234.1
+      max_power: 237.3

@@ -1,0 +1,48 @@
+# Genuine fresh meter readings for the calibrated AZDelivery installation.
+# Configure shelly_status_url and shelly_mac in the main config. Keep the
+# Shelly plug relay on; this package only reads status and never switches it.
+# The main sensor list must use a template sensor named hood_power with
+# update_interval: never, instead of the Home Assistant import.
+json:
+
+http_request:
+  id: shelly_http
+  timeout: 1s
+
+interval:
+  - interval: 1s
+    then:
+      - http_request.get:
+          url: ${shelly_status_url}
+          capture_response: true
+          max_response_buffer_size: 4kB
+          on_response:
+            then:
+              - lambda: |-
+                  bool valid = false;
+                  if (response->status_code == 200) {
+                    valid = json::parse_json(body, [](JsonObject root) -> bool {
+                      if (!root["sys"]["mac"].is<const char *>() ||
+                          strcmp(root["sys"]["mac"].as<const char *>(), "${shelly_mac}") != 0)
+                        return false;
+                      JsonObject meter = root["switch:0"].as<JsonObject>();
+                      if (meter.isNull() || !meter["output"].is<bool>() ||
+                          !meter["output"].as<bool>() || !meter["apower"].is<float>())
+                        return false;
+                      if (!meter["errors"].isNull() &&
+                          (!meter["errors"].is<JsonArray>() || meter["errors"].as<JsonArray>().size() != 0))
+                        return false;
+                      const float watts = meter["apower"].as<float>();
+                      if (!std::isfinite(watts) || watts < 0)
+                        return false;
+                      id(hood_power).publish_state(watts);
+                      return true;
+                    });
+                  }
+                  if (!valid)
+                    id(hood_power).publish_state(NAN);
+          on_error:
+            then:
+              - sensor.template.publish:
+                  id: hood_power
+                  state: !lambda return NAN;
