@@ -1,7 +1,9 @@
 #pragma once
 // Minimal host interfaces for testing the production adapter, not the hardware.
 // LightCall publication order matches ESPHome 2026.9.0 light_call.cpp.
+#include <array>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <initializer_list>
 #include <optional>
@@ -144,12 +146,19 @@ class RemoteTransmitterComponent : public Component {
   Trigger<> *get_complete_trigger() { return &completion; }
 };
 }
-namespace api {
-struct Server {
-  bool connected{true};
-  bool is_connected_with_state_subscription() const { return connected; }
+namespace uart {
+class UARTDevice {
+ public:
+  std::deque<uint8_t> rx;
+  std::vector<std::vector<uint8_t>> written;
+  size_t available() { return rx.size(); }
+  bool read_byte(uint8_t *data) {
+    if (rx.empty()) return false;
+    *data = rx.front();
+    rx.pop_front();
+    return true;
+  }
+  template<size_t N> void write_array(const std::array<uint8_t, N> &data) { written.emplace_back(data.begin(), data.end()); }
 };
-inline Server test_server;
-inline Server *global_api_server = &test_server;
 }
 }

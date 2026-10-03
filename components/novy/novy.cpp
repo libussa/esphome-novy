@@ -1,5 +1,4 @@
 #include "novy.h"
-#include "esphome/components/api/api_server.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 
@@ -91,10 +90,10 @@ void NovyComponent::setup() {
     ESP_LOGI(TAG, "%s", value.c_str());
     status_->publish_state(value);
   };
-  controller_.averaged = [this](float watts) { average_->publish_state(watts); };
-  power_->add_on_state_callback([this](float watts) {
-    controller_.sample(watts, millis());
-  });
+  controller_.averaged = [this](float fan, float light) {
+    fan_power_->publish_state(fan);
+    light_power_->publish_state(light);
+  };
   controller_.start(millis());
   age_->publish_state(NAN);
   ready_ = true;
@@ -102,17 +101,40 @@ void NovyComponent::setup() {
 
 void NovyComponent::loop() {
   auto now = millis();
-  // A log-only API client does not count as an HA state connection. Source
-  // silence is independently detected even when another state client is present.
-  bool connected = api::global_api_server->is_connected_with_state_subscription();
-  if (connected_ && !connected)
-    controller_.disconnect(now);
-  connected_ = connected;
+  read_meter_(now);
   controller_.tick(now);
   if (now - last_age_publish_ >= 1000) {
     last_age_publish_ = now;
     age_->publish_state(controller_.age(now));
   }
+}
+
+void NovyComponent::read_meter_(uint32_t now) {
+  while (polling_ && received_ < JSY194_RESPONSE_SIZE && this->available() &&
+         this->read_byte(&response_[received_]))
+    ++received_;
+  if (polling_ && received_ == JSY194_RESPONSE_SIZE) {
+    polling_ = false;
+    float power[2];
+    // A failed read supplies no sample; persistent failure empties the
+    // averaging windows, which invalidates feedback.
+    if (parse_jsy194(response_, power))
+      controller_.sample(power[fan_channel_], power[light_channel_], now);
+    else
+      ESP_LOGW(TAG, "Invalid JSY-MK-194G response");
+  }
+  if (now - last_poll_ < update_interval_)
+    return;
+  if (polling_)
+    ESP_LOGW(TAG, "JSY-MK-194G response timeout after %u bytes", static_cast<unsigned>(received_));
+  // Drop late or unsolicited bytes so the next response starts aligned.
+  uint8_t discarded;
+  while (this->available() && this->read_byte(&discarded))
+    continue;
+  this->write_array(jsy194_request());
+  last_poll_ = now;
+  polling_ = true;
+  received_ = 0;
 }
 
 void NovyComponent::request_speed(int speed) {
@@ -149,5 +171,7 @@ void NovyComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Novy controller: pairing code %u, calibration %s", pairing_code_,
                 controller_.calibrated() ? "complete" : "missing");
   ESP_LOGCONFIG(TAG, "  Power waveform: %s", power_waveform_.empty() ? "built-in" : "captured override");
+  ESP_LOGCONFIG(TAG, "  JSY-MK-194G: fan channel %u, light channel %u, every %ums", fan_channel_ + 1,
+                light_channel_ + 1, static_cast<unsigned>(update_interval_));
 }
 }  // namespace esphome::novy

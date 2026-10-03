@@ -1,45 +1,24 @@
-# Measured on this Novy 7831 on 2026-10-01; not a generic hood calibration.
-# Includes both initial and warm-motor readings with a 1 W margin.
-# Overlaps deliberately remain ambiguous; see ../docs/power-learning.md.
+# PROVISIONAL ranges for this Novy 7831's JSY-MK-194G fan channel.
+# Taken from the light-off rows of the whole-hood Shelly measurements of
+# 2026-10-01 (commit 8885128), which included a 1 W margin. Motor-only
+# readings may sit a few watts lower: states outside these ranges report
+# unrecognized_power rather than a wrong speed. Re-measure on the JSY.
 novy:
-  calibration:
+  fan_calibration:
     - speed: 0
-      light: false
       min_power: 0.0
       max_power: 1.0
-    - speed: 0
-      light: true
-      min_power: 5.9
-      max_power: 8.0
     - speed: 1
-      light: false
       min_power: 77.0
       max_power: 86.7
-    - speed: 1
-      light: true
-      min_power: 84.3
-      max_power: 95.7
     - speed: 2
-      light: false
       min_power: 139.8
       max_power: 149.6
-    - speed: 2
-      light: true
-      min_power: 143.6
-      max_power: 153.0
     - speed: 3
-      light: false
       min_power: 205.7
       max_power: 211.5
-    - speed: 3
-      light: true
-      min_power: 211.5
-      max_power: 219.0
     - speed: 4
-      light: false
       min_power: 227.0
       max_power: 231.7
-    - speed: 4
-      light: true
-      min_power: 234.1
-      max_power: 237.3
+  # About half the ~7 W the light added to the Shelly readings.
+  light_threshold: 3.0

@@ -24,15 +24,13 @@ def fixture(directory):
 
 
 def calibration():
-    lines = ["calibration:"]
+    lines = ["fan_calibration:"]
     for speed in range(5):
-        for light in (False, True):
-            value = 2 + 30 * speed + 10 * light
-            lines.extend([
-                f"    - speed: {speed}", f"      light: {str(light).lower()}",
-                f"      min_power: {value - 1}", f"      max_power: {value + 1}",
-            ])
-    return "\n".join(lines)
+        value = 2 + 30 * speed
+        lines.extend([
+            f"    - speed: {speed}", f"      min_power: {value - 1}", f"      max_power: {value + 1}",
+        ])
+    return "\n".join(lines + ["  light_threshold: 3"])
 
 
 class ConfigTests(unittest.TestCase):
@@ -60,8 +58,8 @@ class ConfigTests(unittest.TestCase):
         self.check()
 
     def test_captured_power_waveform_codegen(self):
-        self.check(lambda t: t.replace("calibration: []",
-                   "power_waveform: [-12420, 370, -400, 720, -760, 370, -16220]\n  calibration: []"),
+        self.check(lambda t: t.replace("fan_calibration: []",
+                   "power_waveform: [-12420, 370, -400, 720, -760, 370, -16220]\n  fan_calibration: []"),
                    generate=True)
 
     def test_invalid_power_waveform(self):
@@ -70,20 +68,19 @@ class ConfigTests(unittest.TestCase):
                               ("[-70000, 370]", "value must be"),
                               ("[-400]", "at least")):
             with self.subTest(pulses=pulses):
-                self.check(lambda t: t.replace("calibration: []",
-                           f"power_waveform: {pulses}\n  calibration: []"), error)
+                self.check(lambda t: t.replace("fan_calibration: []",
+                           f"power_waveform: {pulses}\n  fan_calibration: []"), error)
 
-    def test_full_calibration_codegen(self):
-        self.check(lambda t: t.replace("calibration: []", calibration()), generate=True)
-
-    def test_partial_feedback_and_light_fallback_codegen(self):
-        self.check(lambda t: t.replace("calibration: []", calibration() +
-                   "\n  light_on_ambiguity: last_known\n  fan_feedback_valid:\n    name: Fan feedback\n"
+    def test_full_calibration_and_axis_feedback_codegen(self):
+        self.check(lambda t: t.replace("fan_calibration: []", calibration() +
+                   "\n  fan_feedback_valid:\n    name: Fan feedback\n"
                    "  light_feedback_valid:\n    name: Light feedback"), generate=True)
 
-    def test_invalid_light_fallback(self):
-        self.check(lambda t: t.replace("calibration: []", "calibration: []\n  light_on_ambiguity: guess"),
-                   "Unknown value")
+    def test_meter_wiring(self):
+        self.check(lambda t: t.replace("fan_channel: 2", "fan_channel: 1"), "must differ")
+        self.check(lambda t: t.replace("update_interval: 500ms", "update_interval: 3s"),
+                   "averaging_window must exceed update_interval")
+        self.check(lambda t: t.replace("  tx_pin: ${jsy_tx_pin}\n", ""), "requires uart")
 
     def test_pairing_code_bounds(self):
         for code in ("0", "11"):
@@ -91,15 +88,16 @@ class ConfigTests(unittest.TestCase):
                 self.check(lambda t: t.replace('pairing_code: "1"', f'pairing_code: "{code}"'), "value must be")
 
     def test_partial_calibration(self):
-        self.check(lambda t: t.replace("calibration: []", "calibration:\n    - speed: 0\n      light: false\n      min_power: 1\n      max_power: 2"), "all ten unique")
+        self.check(lambda t: t.replace("fan_calibration: []", "fan_calibration:\n    - speed: 0\n      min_power: 1\n      max_power: 2"), "all five unique")
 
     def test_duplicate_calibration(self):
-        self.check(lambda t: t.replace("calibration: []", calibration().replace("speed: 4", "speed: 3")), "all ten unique")
+        self.check(lambda t: t.replace("fan_calibration: []", calibration().replace("speed: 4", "speed: 3")), "all five unique")
 
     def test_invalid_ranges(self):
-        for low, high, error in (("3", "1", "max_power"), (".nan", "3", "finite"), ("-1", "3", "non-negative")):
-            with self.subTest(low=low):
-                self.check(lambda t: t.replace("calibration: []", calibration().replace("min_power: 1\n      max_power: 3", f"min_power: {low}\n      max_power: {high}", 1)), error)
+        for low, high, error in (("3", "1", "max_power"), (".nan", "3", "finite"), ("-1", "3", "non-negative"),
+                                 ("1", "40", "must not overlap")):
+            with self.subTest(low=low, high=high):
+                self.check(lambda t: t.replace("fan_calibration: []", calibration().replace("min_power: 1\n      max_power: 3", f"min_power: {low}\n      max_power: {high}", 1)), error)
 
     def test_invalid_timing(self):
         self.check(lambda t: t.replace("step_timeout: 30s", "step_timeout: 9s"), "step_timeout must exceed")

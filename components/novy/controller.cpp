@@ -42,19 +42,16 @@ std::vector<int32_t> waveform(Command command, unsigned pairing_code) {
 }
 
 bool Controller::calibrated() const {
-  if (calibration.size() != 10)
+  if (fan_calibration.size() != 5 || !std::isfinite(light_threshold) || light_threshold <= 0)
     return false;
   unsigned mask = 0;
-  for (const auto &entry : calibration) {
-    if (entry.mode.speed < 0 || entry.mode.speed > 4 || !std::isfinite(entry.min_power) ||
-        !std::isfinite(entry.max_power) || entry.min_power < 0 || entry.max_power < entry.min_power)
+  for (const auto &range : fan_calibration) {
+    if (range.speed < 0 || range.speed > 4 || !std::isfinite(range.min_power) ||
+        !std::isfinite(range.max_power) || range.min_power < 0 || range.max_power < range.min_power)
       return false;
-    unsigned bit = 1U << (entry.mode.speed * 2 + entry.mode.light);
-    if (mask & bit)
-      return false;
-    mask |= bit;
+    mask |= 1U << range.speed;
   }
-  return mask == 1023;
+  return mask == 31;
 }
 
 void Controller::set_status_(const char *value) {
@@ -67,7 +64,7 @@ void Controller::set_status_(const char *value) {
 
 void Controller::reset_window_(uint32_t now) {
   window_start_ = now;
-  sum_ = 0;
+  fan_sum_ = light_sum_ = 0;
   samples_ = 0;
   speed_count_ = light_count_ = 0;
 }
@@ -81,29 +78,21 @@ void Controller::start(uint32_t now) {
 
 void Controller::invalidate_(const char *reason, uint32_t now) {
   active_ = false;
-  unconfirmed_light_request_ = false;
   reset_window_(now);
   set_confidence_(false, false);
   set_status_(reason);
 }
 
-void Controller::disconnect(uint32_t now) {
-  invalidate_("feedback_disconnected", now);
-}
-
-void Controller::sample(float watts, uint32_t now) {
+void Controller::sample(float fan_watts, float light_watts, uint32_t now) {
   // Advance BEFORE adding: a late sample cannot revive an expired previous window.
   tick(now);
-  if (!std::isfinite(watts) || watts < 0) {
-    invalidate_("invalid_power", now);
-    return;
-  }
   seen_sample_ = true;
   stale_announced_ = false;
   last_sample_ = now;
   if (transmitting_ || settling_)
     return;
-  sum_ += watts;
+  fan_sum_ += fan_watts;
+  light_sum_ += light_watts;
   ++samples_;
 }
 
@@ -134,13 +123,14 @@ void Controller::tick(uint32_t now) {
   if (now - window_start_ < timing.window)
     return;
   const auto count = samples_;
-  const float average = count ? static_cast<float>(sum_ / count) : NAN;
+  const float fan = count ? static_cast<float>(fan_sum_ / count) : NAN;
+  const float light = count ? static_cast<float>(light_sum_ / count) : NAN;
   const bool skipped_window = now - window_start_ >= 2 * timing.window;
   window_start_ = now;
-  sum_ = 0;
+  fan_sum_ = light_sum_ = 0;
   samples_ = 0;
   if (averaged)
-    averaged(average);
+    averaged(fan, light);
   if (!count || skipped_window) {
     invalidate_("missing_power_window", now);
     return;
@@ -149,33 +139,17 @@ void Controller::tick(uint32_t now) {
     invalidate_("uncalibrated", now);
     return;
   }
+  // The light channel is a plain threshold. The fan channel must fall in
+  // exactly one range; no nearest-range guess is made.
   unsigned matches = 0;
-  Mode match;
-  bool speed_known = true, light_known = true;
-  for (const auto &entry : calibration) {
-    if (average >= entry.min_power && average <= entry.max_power) {
-      if (matches) {
-        speed_known = speed_known && match.speed == entry.mode.speed;
-        light_known = light_known && match.light == entry.mode.light;
-      } else {
-        match = entry.mode;
-      }
+  int speed = 0;
+  for (const auto &range : fan_calibration) {
+    if (fan >= range.min_power && fan <= range.max_power) {
+      speed = range.speed;
       ++matches;
     }
   }
-  if (!matches) {
-    speed_count_ = light_count_ = 0;
-    set_confidence_(false, false);
-    // Fresh out-of-range readings during motor acceleration are not loss of
-    // the meter. Await the deadline without retrying or advancing a fan step.
-    if (active_)
-      set_status_("awaiting_confirmation");
-    else if (status_ != "confirmation_timeout" && status_ != "transmission_failed" &&
-             status_ != "unexpected_state" && status_ != "transmitter_timeout")
-      set_status_("unrecognized_power");
-    return;
-  }
-  confirm_(speed_known, match.speed, light_known, match.light, now);
+  confirm_(matches == 1, speed, light >= light_threshold, now);
 }
 
 void Controller::set_confidence_(bool speed, bool light) {
@@ -197,7 +171,7 @@ std::string Controller::inferred_mode() const {
   return "unknown";
 }
 
-void Controller::confirm_(bool speed_known, int speed, bool light_known, bool light, uint32_t now) {
+void Controller::confirm_(bool speed_known, int speed, bool light, uint32_t now) {
   const Mode previous = mode_;
   bool speed_valid = speed_valid_, light_valid = light_valid_;
   if (!speed_known) {
@@ -215,20 +189,15 @@ void Controller::confirm_(bool speed_known, int speed, bool light_known, bool li
       speed_valid = true;
     }
   }
-  if (!light_known) {
-    light_count_ = 0;
+  if (light != mode_.light)
     light_valid = false;
+  if (!light_count_ || light != candidate_.light) {
+    candidate_.light = light;
+    light_count_ = 1;
   } else {
-    if (light != mode_.light)
-      light_valid = false;
-    if (!light_count_ || light != candidate_.light) {
-      candidate_.light = light;
-      light_count_ = 1;
-    } else {
-      light_count_ = 2;
-      mode_.light = light;
-      light_valid = true;
-    }
+    light_count_ = 2;
+    mode_.light = light;
+    light_valid = true;
   }
   if ((speed_valid || light_valid) && (!has_observation_ || mode_ != previous)) {
     has_observation_ = true;
@@ -255,14 +224,16 @@ void Controller::confirm_(bool speed_known, int speed, bool light_known, bool li
     } else {
       next_step_(now);
     }
-  } else if (!speed_known || !light_known) {
+  } else if (!speed_known) {
+    // Fresh out-of-range fan readings, e.g. motor acceleration, are not loss
+    // of the meter; the light axis stays usable. An active fan step instead
+    // awaits its deadline above, without retrying.
     if (status_ != "confirmation_timeout" && status_ != "transmission_failed" &&
         status_ != "unexpected_state" && status_ != "transmitter_timeout")
-      set_status_("ambiguous_power");
+      set_status_("unrecognized_power");
   } else if (valid_ && (status_ == "waiting_for_feedback" || status_ == "raw_sent" || status_ == "uncalibrated" ||
-             status_ == "feedback_disconnected" || status_ == "feedback_stale" || status_ == "invalid_power" ||
-             status_ == "unrecognized_power" || status_ == "ambiguous_power" || status_ == "missing_power_window" ||
-             status_ == "light_unconfirmed" || status_ == "already_satisfied_unconfirmed")) {
+             status_ == "feedback_stale" || status_ == "unrecognized_power" ||
+             status_ == "missing_power_window")) {
     set_status_("ready");
   }
 }
@@ -274,19 +245,17 @@ bool Controller::request_(Mode target, Target kind, uint32_t now) {
     return false;
   }
   const bool known = kind == Target::SPEED ? speed_valid_ : light_valid_;
-  const bool light_fallback = kind == Target::LIGHT && allow_unconfirmed_light && speed_valid_;
-  if (!calibrated() || (!known && !light_fallback)) {
+  if (!calibrated() || !known) {
     set_status_("rejected_invalid_feedback");
     return false;
   }
   const bool satisfied = kind == Target::SPEED ? target.speed == mode_.speed : target.light == mode_.light;
   if (satisfied) {
-    set_status_(known ? "already_satisfied" : "already_satisfied_unconfirmed");
+    set_status_("already_satisfied");
     return true;
   }
   target_ = target;
   target_kind_ = kind;
-  unconfirmed_light_request_ = kind == Target::LIGHT && allow_unconfirmed_light;
   active_ = true;
   next_step_(now);
   return true;
@@ -339,7 +308,6 @@ bool Controller::raw(Command command, uint32_t now) {
     return false;
   }
   active_ = false;
-  unconfirmed_light_request_ = false;
   if (transmitting_) {
     // One bounded pending manual press. Finish the in-flight waveform first.
     pending_raw_ = true;
@@ -369,18 +337,6 @@ void Controller::transmission_done(uint32_t now, bool success) {
   completed_at_ = now;
   settling_ = true;
   reset_window_(now);
-  if (active_ && unconfirmed_light_request_) {
-    // The user explicitly chose remembered-state light control. RF completion
-    // is an assumption, not reception proof; never mark it as verified.
-    mode_.light = target_.light;
-    active_ = false;
-    unconfirmed_light_request_ = false;
-    if (observed)
-      observed(mode_);
-    set_confidence_(false, false);
-    set_status_("light_unconfirmed");
-    return;
-  }
   // Preserve an in-flight target's feedback failure instead of calling it a
   // successful raw press when its waveform eventually finishes.
   if (active_)

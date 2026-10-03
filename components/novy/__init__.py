@@ -1,19 +1,19 @@
-"""Novy RF controller with measured power feedback (ESPHome 2026.9.0)."""
+"""Novy RF controller with JSY-MK-194G power feedback (ESPHome 2026.9.0)."""
 
 import math
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
 import esphome.final_validate as fv
-from esphome.components import binary_sensor, button, fan, light, remote_transmitter, sensor, text_sensor
+from esphome.components import binary_sensor, button, fan, light, remote_transmitter, sensor, text_sensor, uart
 from esphome.const import CONF_ID, CONF_OUTPUT_ID
 
-DEPENDENCIES = ["esp32", "api", "remote_transmitter"]
+DEPENDENCIES = ["esp32", "remote_transmitter", "uart"]
 AUTO_LOAD = ["sensor", "binary_sensor", "text_sensor", "fan", "light", "button"]
 MULTI_CONF = False
 
 ns = cg.esphome_ns.namespace("novy")
-NovyComponent = ns.class_("NovyComponent", cg.Component)
+NovyComponent = ns.class_("NovyComponent", cg.Component, uart.UARTDevice)
 NovyFan = ns.class_("NovyFan", fan.Fan)
 NovyLight = ns.class_("NovyLight", light.LightOutput)
 NovyButton = ns.class_("NovyButton", button.Button)
@@ -30,23 +30,26 @@ def finite_power(value):
     return value
 
 
-ENTRY = cv.Schema({
+FAN_RANGE = cv.Schema({
     cv.Required("speed"): cv.int_range(min=0, max=4),
-    cv.Required("light"): cv.boolean,
     cv.Required("min_power"): finite_power,
     cv.Required("max_power"): finite_power,
 })
 
 
-def validate_calibration(entries):
+def validate_fan_calibration(entries):
     if not entries:
         return entries
-    if len(entries) != 10 or len({(e["speed"], e["light"]) for e in entries}) != 10:
-        raise cv.Invalid("Provide all ten unique speed/light combinations, or [] for commissioning")
+    if len(entries) != 5 or len({e["speed"] for e in entries}) != 5:
+        raise cv.Invalid("Provide all five unique fan speeds 0-4, or [] for commissioning")
     for entry in entries:
         if entry["max_power"] < entry["min_power"]:
             raise cv.Invalid("max_power must be >= min_power")
-    # Overlap is allowed: the runtime must report ambiguity instead of guessing.
+    # The fan channel measures the motor alone, so ranges must be distinct.
+    ordered = sorted(entries, key=lambda e: e["min_power"])
+    for lower, upper in zip(ordered, ordered[1:]):
+        if upper["min_power"] <= lower["max_power"]:
+            raise cv.Invalid("Fan power ranges must not overlap")
     return entries
 
 
@@ -54,6 +57,10 @@ def validate_settings(config):
     window = config["averaging_window"].total_milliseconds
     settle = config["settle_time"].total_milliseconds
     timeout = config["step_timeout"].total_milliseconds
+    if config["fan_channel"] == config["light_channel"]:
+        raise cv.Invalid("fan_channel and light_channel must differ")
+    if config["update_interval"].total_milliseconds >= window:
+        raise cv.Invalid("averaging_window must exceed update_interval")
     if config["stale_timeout"].total_milliseconds <= window:
         raise cv.Invalid("stale_timeout must exceed averaging_window")
     if timeout <= settle + 2 * window:
@@ -87,26 +94,30 @@ def validate_power_waveform(pulses):
 CONFIG_SCHEMA = cv.All(cv.Schema({
     cv.GenerateID(): cv.declare_id(NovyComponent),
     cv.Required("transmitter_id"): cv.use_id(remote_transmitter.RemoteTransmitterComponent),
-    cv.Required("power_sensor_id"): cv.use_id(sensor.Sensor),
+    cv.Required("fan_channel"): cv.int_range(min=1, max=2),
+    cv.Required("light_channel"): cv.int_range(min=1, max=2),
+    cv.Optional("update_interval", default="500ms"): duration,
     cv.Optional("pairing_code", default=1): cv.int_range(min=1, max=10),
     # Complete measured button press, including its pairing bits and repeats.
     cv.Optional("power_waveform"): cv.All(
         cv.ensure_list(cv.int_range(min=-65535, max=65535)),
         cv.Length(min=2, max=4096), validate_power_waveform),
-    cv.Optional("calibration", default=[]): cv.All(cv.ensure_list(ENTRY), validate_calibration),
+    cv.Optional("fan_calibration", default=[]): cv.All(cv.ensure_list(FAN_RANGE), validate_fan_calibration),
+    cv.Optional("light_threshold"): cv.All(finite_power, cv.float_range(min=0, min_included=False)),
     cv.Optional("averaging_window", default="3s"): duration,
     cv.Optional("stale_timeout", default="30s"): duration,
     cv.Optional("settle_time", default="3s"): duration,
     cv.Optional("step_timeout", default="30s"): duration,
-    cv.Optional("light_on_ambiguity", default="reject"): cv.one_of("reject", "last_known", lower=True),
     cv.Required("fan"): fan.fan_schema(NovyFan, default_restore_mode="NO_RESTORE"),
     cv.Required("light"): light.light_schema(NovyLight, light.LightType.BINARY, default_restore_mode="ALWAYS_OFF"),
     cv.Required("raw_buttons"): cv.Schema({
         cv.Required(name): button.button_schema(NovyButton).extend({cv.Optional("disabled_by_default", default=True): cv.boolean})
         for name in COMMANDS
     }),
-    cv.Required("average_power"): sensor.sensor_schema(unit_of_measurement="W", accuracy_decimals=1,
-                                                     device_class="power", state_class="measurement"),
+    cv.Required("fan_power"): sensor.sensor_schema(unit_of_measurement="W", accuracy_decimals=1,
+                                                 device_class="power", state_class="measurement"),
+    cv.Required("light_power"): sensor.sensor_schema(unit_of_measurement="W", accuracy_decimals=1,
+                                                   device_class="power", state_class="measurement"),
     cv.Required("reading_age"): sensor.sensor_schema(unit_of_measurement="s", accuracy_decimals=0,
                                                    entity_category="diagnostic"),
     cv.Required("feedback_valid"): binary_sensor.binary_sensor_schema(entity_category="diagnostic"),
@@ -114,7 +125,7 @@ CONFIG_SCHEMA = cv.All(cv.Schema({
     cv.Optional("light_feedback_valid"): binary_sensor.binary_sensor_schema(entity_category="diagnostic"),
     cv.Required("inferred_mode"): text_sensor.text_sensor_schema(entity_category="diagnostic"),
     cv.Required("command_status"): text_sensor.text_sensor_schema(entity_category="diagnostic"),
-}).extend(cv.COMPONENT_SCHEMA), validate_settings)
+}).extend(cv.COMPONENT_SCHEMA).extend(uart.UART_DEVICE_SCHEMA), validate_settings)
 
 
 def validate_transmitter(config):
@@ -130,22 +141,31 @@ def validate_transmitter(config):
     return config
 
 
-FINAL_VALIDATE_SCHEMA = validate_transmitter
+def final_validate(config):
+    validate_transmitter(config)
+    uart.final_validate_device_schema("novy", require_tx=True, require_rx=True)(config)
+    return config
+
+
+FINAL_VALIDATE_SCHEMA = final_validate
 
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
+    await uart.register_uart_device(var, config)
     cg.add(var.set_transmitter(await cg.get_variable(config["transmitter_id"])))
-    cg.add(var.set_power_sensor(await cg.get_variable(config["power_sensor_id"])))
     cg.add(var.set_pairing_code(config["pairing_code"]))
-    cg.add(var.set_allow_unconfirmed_light(config["light_on_ambiguity"] == "last_known"))
+    cg.add(var.set_channels(config["fan_channel"], config["light_channel"]))
+    cg.add(var.set_update_interval(config["update_interval"].total_milliseconds))
     if "power_waveform" in config:
         cg.add(var.set_power_waveform(config["power_waveform"]))
     cg.add(var.set_timing(*(config[key].total_milliseconds for key in
                            ("averaging_window", "stale_timeout", "settle_time", "step_timeout"))))
-    for entry in config["calibration"]:
-        cg.add(var.add_calibration(entry["speed"], entry["light"], entry["min_power"], entry["max_power"]))
+    for entry in config["fan_calibration"]:
+        cg.add(var.add_fan_range(entry["speed"], entry["min_power"], entry["max_power"]))
+    if "light_threshold" in config:
+        cg.add(var.set_light_threshold(config["light_threshold"]))
     fan_var = await fan.new_fan(config["fan"], var)
     cg.add(var.set_fan(fan_var))
     light_var = cg.new_Pvariable(config["light"][CONF_OUTPUT_ID], var)
@@ -153,7 +173,8 @@ async def to_code(config):
     cg.add(var.set_light(light_var))
     for name, command in COMMANDS.items():
         await button.new_button(config["raw_buttons"][name], var, command)
-    for key, setter in (("average_power", "set_average_sensor"), ("reading_age", "set_age_sensor")):
+    for key, setter in (("fan_power", "set_fan_power_sensor"), ("light_power", "set_light_power_sensor"),
+                        ("reading_age", "set_age_sensor")):
         cg.add(getattr(var, setter)(await sensor.new_sensor(config[key])))
     cg.add(var.set_valid_sensor(await binary_sensor.new_binary_sensor(config["feedback_valid"])))
     for key, setter in (("fan_feedback_valid", "set_speed_valid_sensor"),

@@ -15,8 +15,8 @@ struct Mode {
   bool operator==(const Mode &other) const { return speed == other.speed && light == other.light; }
   bool operator!=(const Mode &other) const { return !(*this == other); }
 };
-struct Calibration {
-  Mode mode;
+struct FanRange {
+  int speed;
   float min_power;
   float max_power;
 };
@@ -30,20 +30,19 @@ struct Timing {
 // Pure logic: both host tests and the ESPHome adapter use this exact implementation.
 class Controller {
  public:
-  std::vector<Calibration> calibration;
+  std::vector<FanRange> fan_calibration;
+  float light_threshold{NAN};
   Timing timing;
   std::function<void(Command)> transmit;
   std::function<void(Mode)> observed;
   std::function<void(bool)> validity;
   std::function<void(bool, bool)> confidence;
   std::function<void(const std::string &)> status;
-  std::function<void(float)> averaged;
-  bool allow_unconfirmed_light{false};
+  std::function<void(float, float)> averaged;
 
   void start(uint32_t now);
-  void sample(float watts, uint32_t now);
+  void sample(float fan_watts, float light_watts, uint32_t now);
   void tick(uint32_t now);
-  void disconnect(uint32_t now);
   bool request_speed(int speed, uint32_t now);
   bool request_light(bool light, uint32_t now);
   bool raw(Command command, uint32_t now);
@@ -68,11 +67,11 @@ class Controller {
   bool request_(Mode target, Target kind, uint32_t now);
   void next_step_(uint32_t now);
   void send_(Command command, uint32_t now);
-  void confirm_(bool speed_known, int speed, bool light_known, bool light, uint32_t now);
+  void confirm_(bool speed_known, int speed, bool light, uint32_t now);
 
   Mode mode_{}, target_{}, before_{}, expected_{}, candidate_{};
   bool valid_{false}, has_observation_{false}, seen_sample_{false};
-  bool speed_valid_{false}, light_valid_{false}, unconfirmed_light_request_{false};
+  bool speed_valid_{false}, light_valid_{false};
   Target target_kind_{Target::SPEED};
   bool stale_announced_{false};
   bool active_{false}, transmitting_{false}, settling_{false}, pending_raw_{false};
@@ -80,7 +79,7 @@ class Controller {
   Command raw_command_{Command::LIGHT};
   uint8_t speed_count_{0}, light_count_{0};
   uint32_t last_sample_{0}, window_start_{0}, sent_at_{0}, completed_at_{0};
-  double sum_{0};
+  double fan_sum_{0}, light_sum_{0};
   uint32_t samples_{0};
   std::string status_{"uncalibrated"};
 };

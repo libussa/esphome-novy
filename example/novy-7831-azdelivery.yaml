@@ -3,9 +3,9 @@ substitutions:
   friendly_name: Novy Hood
   data_pin: GPIO4
   pairing_code: "1"
-  # This installation's Shelly Plug M Gen3; reserve its address in DHCP.
-  shelly_status_url: http://10.10.10.183/rpc/Shelly.GetStatus
-  shelly_mac: 70AF09E08A6C
+  # JSY-MK-194G TTL: JSY TX -> ESP RX, JSY RX -> ESP TX.
+  jsy_rx_pin: GPIO16
+  jsy_tx_pin: GPIO17
 
 esphome:
   name: ${name}
@@ -42,7 +42,6 @@ logger:
 # Power waveform verified on this hood with the original remote's pairing code 1.
 packages:
   power_replay: !include novy-power-waveform.yaml
-  measured_power: !include novy-shelly-power.yaml
   power_calibration: !include novy-power-calibration.yaml
 
 external_components:
@@ -59,30 +58,28 @@ remote_transmitter:
   non_blocking: true
   eot_level: false
 
-sensor:
-  - platform: template
-    id: hood_power
-    name: Novy measured power
-    update_interval: never
-    internal: true
-    unit_of_measurement: W
-    device_class: power
-    state_class: measurement
-    # Each HTTP response supplies a fresh sample, including unchanged watts.
-    # Failed requests publish NaN immediately; cached values are never repeated.
+# JSY-MK-194G factory defaults: address 1, 4800 baud, 8N1. VCC -> 3.3V.
+uart:
+  id: jsy_uart
+  rx_pin: ${jsy_rx_pin}
+  tx_pin: ${jsy_tx_pin}
+  baud_rate: 4800
 
 novy:
   id: hood
   transmitter_id: novy_rf
-  power_sensor_id: hood_power
+  uart_id: jsy_uart
+  # CT1 on the light conductor, CT2 on the motor's common conductor.
+  light_channel: 1
+  fan_channel: 2
   pairing_code: ${pairing_code}
-  averaging_window: 2s
-  stale_timeout: 10s
+  # The JSY refreshes every 330 ms; one read takes about 170 ms at 4800 baud.
+  update_interval: 500ms
+  averaging_window: 1s
+  stale_timeout: 5s
   settle_time: 2s
   step_timeout: 15s
-  light_on_ambiguity: last_known
-  # Installation-specific measured ranges come from the calibration package.
-  # Fan confidence is independent of light ambiguity; see ../docs/power-learning.md.
+  # Fan ranges and light threshold come from the calibration package.
   fan:
     name: Novy Fan
   light:
@@ -99,8 +96,10 @@ novy:
       name: Novy Raw speed down
     novy:
       name: Novy Raw Novy
-  average_power:
-    name: Novy Average power
+  fan_power:
+    name: Novy Fan power
+  light_power:
+    name: Novy Light power
   reading_age:
     name: Novy Reading age
   feedback_valid:
